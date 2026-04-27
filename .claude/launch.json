@@ -1,0 +1,35 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "리뷰 전체 수집",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["collect_all_reviews.js"],
+      "port": 0
+    },
+    {
+      "name": "AI 답변 생성 (Claude Haiku)",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["generate_responses.js"],
+      "port": 0
+    },
+    {
+      "name": "셀러센터 자동 포스팅 (Puppeteer)",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["post_to_naver_puppeteer.js"],
+      "port": 0
+    },
+    {
+      "name": "네이버 API 포스팅 (직접 API)",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["post_to_naver.js"],
+      "port": 0
+    },
+    {
+      "name": "리뷰 수집 (단일 상품)",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["collect_reviews.js"],
+      "port": 0
+    }
+  ]
+}

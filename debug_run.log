@@ -1,0 +1,444 @@
+
+╔══════════════════════════════════════════════════════════════╗
+║   코에르 리뷰 답변 셀러센터 자동 포스팅 (AG Grid v2)        ║
+╚══════════════════════════════════════════════════════════════╝
+
+[파일] 리뷰답변_자동_20260413_152748.xlsx
+[컬럼] id:2, date:3, response:6, posted:-1
+  포스팅완료 컬럼 추가 (col 7)
+[리뷰] 총 90개 / 포스팅 대상: 79개
+    - "ssw0__2026.04.12" → 리뷰 감사합니다. 앞으로도 코에르 제...
+    - "like__2026.04.05" → 리뷰 감사합니다. 앞으로도 코에르 제...
+    - "wana__2026.04.11" → 리뷰 감사합니다. 앞으로도 코에르 제...
+    - "ssw0__2026.03.12" → 리뷰 감사합니다. 앞으로도 코에르 제...
+    - "qkqn__2026.03.07" → 리뷰 감사합니다. 앞으로도 코에르 제...
+
+[브라우저] 실행 중...
+[인증] 셀러센터 로그인...
+  저장된 세션 확인 중...
+  ✓ 세션 로그인 성공
+
+[리뷰 페이지] 로드 중...
+  날짜 범위: 1년 선택
+  답글여부 필터: not-found
+  검색 버튼 클릭
+  총 8555개 리뷰
+
+[디버그] 첫 행: writer="taro***", date="2026.04.14. 16:40", reviewNo="5401033074", hasReply=false
+  allTexts: ["5401033074","코에르 욕실매트 아기 욕조미끄럼방지패드 화장실앞발판 타일바닥고무깔판 건식논슬립다용도깔개 S","일반","5","어머니가 욕실에서 한번 미끄러져 다치신 후 계속 사용중이예요. 관리를 해도 곰팡이 때문에 주기적으로 교체해야 되더라구요.\n이번껀 곰팡이가 좀 덜 피었으면 좋겠습니다 ㅎㅎ;;","0","taro***","2026.04.14. 16:40"]
+  matchKey: "taro__2026.04.14" → 매칭없음
+
+[포스팅] 리뷰 순회 시작...
+
+  [스크롤 컨테이너] {"ag-body-viewport":{"scrollTop":0,"scrollH":47500,"clientH":393},"ag-center-cols-viewport":{"scrollTop":0,"scrollH":47500,"clientH":47500},"ag-body-horizontal-scroll-viewport":{"scrollTop":0,"scrollH":15,"clientH":0},"window":{"scrollY":143,"innerH":953,"docH":2015}}
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+  [ssw0**** / 2026.04.12] 코에르 샤워기 온오프 헤드 세트 욕실...   [디버그 체크박스] {"found":true,"checked":"no-cb","enabledBtns":["알림","할 일","솔루션","도움말","톡톡상담","오늘","1주일","1개월","3개월","6개월","1년","카테고리 템플릿","검색","초기화","엑셀다운"]}
+  [디버그 버튼목록] [{"text":"알림","disabled":false},{"text":"할 일","disabled":false},{"text":"솔루션","disabled":false},{"text":"도움말","disabled":false},{"text":"톡톡상담","disabled":false},{"text":"구매 확률 4배 높여주는 리뷰 알아보","disabled":false},{"text":"오늘","disabled":false},{"text":"1주일","disabled":false},{"text":"1개월","disabled":false},{"text":"3개월","disabled":false},{"text":"6개월","disabled":false},{"text":"1년","disabled":false},{"text":"카테고리 템플릿","disabled":false},{"text":"검색","disabled":false},{"text":"초기화","disabled":false}]
+  [디버그 답글클릭] true
+  [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✗ 오류: successCount is not defined
+  [stas**** / 2026.04.12] 코에르 테라조 화장솜 디스펜서 면봉 ...   [디버그 체크박스] {"found":true,"checked":"no-cb","enabledBtns":["알림","할 일","솔루션","도움말","톡톡상담","오늘","1주일","1개월","3개월","6개월","1년","카테고리 템플릿","검색","초기화","엑셀다운"]}
+  [디버그 버튼목록] [{"text":"×","disabled":false},{"text":"등록","disabled":false},{"text":"닫기","disabled":false},{"text":"알림","disabled":false},{"text":"할 일","disabled":false},{"text":"솔루션","disabled":false},{"text":"도움말","disabled":false},{"text":"톡톡상담","disabled":false},{"text":"구매 확률 4배 높여주는 리뷰 알아보","disabled":false},{"text":"오늘","disabled":false},{"text":"1주일","disabled":false},{"text":"1개월","disabled":false},{"text":"3개월","disabled":false},{"text":"6개월","disabled":false},{"text":"1년","disabled":false}]
+  [디버그 답글클릭] true
+  [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✗ 오류: successCount is not defined
+  [sma0***** / 2026.04.12] 코에르 욕실매트 아기 욕조미끄럼방지패...   [디버그 체크박스] {"found":true,"checked":"no-cb","enabledBtns":["알림","할 일","솔루션","도움말","톡톡상담","오늘","1주일","1개월","3개월","6개월","1년","카테고리 템플릿","검색","초기화","엑셀다운"]}
+  [디버그 버튼목록] [{"text":"×","disabled":false},{"text":"등록","disabled":false},{"text":"닫기","disabled":false},{"text":"알림","disabled":false},{"text":"할 일","disabled":false},{"text":"솔루션","disabled":false},{"text":"도움말","disabled":false},{"text":"톡톡상담","disabled":false},{"text":"구매 확률 4배 높여주는 리뷰 알아보","disabled":false},{"text":"오늘","disabled":false},{"text":"1주일","disabled":false},{"text":"1개월","disabled":false},{"text":"3개월","disabled":false},{"text":"6개월","disabled":false},{"text":"1년","disabled":false}]
+  [디버그 답글클릭] true
+  [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✗ 오류: successCount is not defined
+  [bn**** / 2026.04.12] 코에르 규조토발매트 빨아쓰는 주방 욕...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [qyeo***** / 2026.04.12] 코에르 욕실화 미끄럼방지 발등낮은 화...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [koal***** / 2026.04.11] 코에르 테라조 디스펜서 핸드워시 비누...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+    스크롤 이동: .ag-body-viewport
+  [진행] 스크롤 10회 / 성공 3 / 실패 3 / 남은 73
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+  [wana****** / 2026.04.11] 코에르 샤워기 온오프 헤드 세트 욕실...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+  [lsy6****** / 2026.04.10] 코에르 욕실화 미끄럼방지 발등낮은 화...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+  [ruin**** / 2026.04.09] 코에르 욕실매트 아기 욕조미끄럼방지패...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+  [choh***** / 2026.04.08] 코에르 테라조 화장솜 디스펜서 면봉 ...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [miss******** / 2026.04.08] 코에르 스텐 디스펜서 핸드워시 비누 ...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [ds**** / 2026.04.08] 코에르 호텔 수건 40수 코마사 고급...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [cjev*** / 2026.04.07] 코에르 호텔 수건 40수 코마사 고급...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+  [진행] 스크롤 20회 / 성공 10 / 실패 3 / 남은 66
+  [best***** / 2026.04.07] 코에르 욕실매트 아기 욕조미끄럼방지패...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [진행] 스크롤 20회 / 성공 11 / 실패 3 / 남은 65
+  [demi******** / 2026.04.07] 코에르 욕실화 미끄럼방지 발등낮은 화...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [진행] 스크롤 20회 / 성공 12 / 실패 3 / 남은 64
+  [gski***** / 2026.04.06] 코에르 호텔 수건 40수 코마사 고급...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [진행] 스크롤 20회 / 성공 13 / 실패 3 / 남은 63
+  [to**** / 2026.04.06] [세트] 코에르 스테인리스 2종 세트...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [진행] 스크롤 20회 / 성공 14 / 실패 3 / 남은 62
+  [bboo****** / 2026.04.06] 코에르 스텐 욕실선반 무타공 화장실 ...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [진행] 스크롤 20회 / 성공 15 / 실패 3 / 남은 61
+    스크롤 이동: .ag-body-viewport
+  [hyun******** / 2026.04.06] 코에르 테라조 고급 욕실 트레이 받침...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [a576**** / 2026.04.05] 코에르 스텐 디스펜서 핸드워시 비누 ...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [ctrl**** / 2026.04.05] 코에르 테라조 칫솔꽂이 치약 칫솔걸이...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [sjcj******* / 2026.04.05] 코에르 스텐 욕실선반 무타공 화장실 ...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [84he**** / 2026.04.04] 코에르 규조토발매트 빨아쓰는 주방 욕...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+    스크롤 이동: .ag-body-viewport
+  [movi***** / 2026.04.04] 코에르 부속품 모음...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [yun6***** / 2026.04.04] 코에르 호텔 수건 40수 코마사 고급...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [nams**** / 2026.04.04] [세트] 코에르 스테인리스 2종 세트...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [dmsw****** / 2026.04.03] 코에르 테라조 멀티홀더 칫솔꽂이 치약...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [hsh3**** / 2026.04.03] 코에르 스텐 디스펜서 핸드워시 비누 ...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [kl**** / 2026.04.02] 코에르 테라조 고급 욕실 트레이 받침...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [well*** / 2026.04.03] 코에르 스텐 칫솔꽂이 치약 칫솔걸이 ...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+    스크롤 이동: .ag-body-viewport
+  [erud*** / 2026.04.01] 코에르 호텔 수건 40수 코마사 고급...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [tlsg******** / 2026.04.01] 코에르 스텐 칫솔꽂이 치약 칫솔걸이 ...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+    스크롤 이동: .ag-body-viewport
+  [clar***** / 2026.04.01] 코에르 스텐 고급 욕실 트레이 받침대...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+    스크롤 이동: .ag-body-viewport
+  [kshl******** / 2026.03.31] 코에르 테라조 비누받침대 물빠짐 거치...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [wool***** / 2026.03.31] 코에르 스텐 욕실선반 무타공 화장실 ...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+  [suah**** / 2026.03.30] 코에르 테라조 비누받침대 물빠짐 거치...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+    스크롤 이동: .ag-body-viewport
+  [grrj**** / 2026.03.29] 코에르 호텔 수건 40수 코마사 고급...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [kjwy***** / 2026.03.29] [세트] 코에르 테라조 2종 세트 (...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [dyle*** / 2026.03.29] 코에르 스텐 비누받침대 물빠짐 거치대...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [kimg**** / 2026.03.29] 코에르 호텔 수건 40수 코마사 고급...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [hjsh****** / 2026.03.29] 코에르 스텐 고급 욕실 트레이 받침대...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [iq**** / 2026.03.28] 코에르 테라조 고급 욕실 드라이 트레...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [de**** / 2026.03.28] 코에르 스텐 고급 욕실 트레이 받침대...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [vye1*** / 2026.03.27] 코에르 스텐 비누받침대 물빠짐 거치대...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [rod1***** / 2026.03.28] 코에르 테라조 멀티홀더 칫솔꽂이 치약...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [cp**** / 2026.03.27] 코에르 스텐 욕실선반 무타공 화장실 ...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+    스크롤 이동: .ag-body-viewport
+  [진행] 스크롤 30회 / 성공 43 / 실패 3 / 남은 33
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+  [진행] 스크롤 40회 / 성공 43 / 실패 3 / 남은 33
+    스크롤 이동: .ag-body-viewport
+  [jju6*** / 2026.03.24] 코에르 테라조 화장솜 디스펜서 면봉 ...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+  [ymk0*** / 2026.03.24] 코에르 호텔 수건 40수 코마사 고급...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+  [진행] 스크롤 50회 / 성공 45 / 실패 3 / 남은 31
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-horizontal-scroll-viewport
+    스크롤 이동: window
+    스크롤 이동: window
+    스크롤 정지 (1/5)
+    스크롤 정지 (2/5)
+    스크롤 정지 (3/5)
+    스크롤 정지 (4/5)
+    스크롤 정지 (5/5)
+  [페이지 1] 끝 → 다음 페이지 확인...
+  [다음 페이지] → page 2
+  → 페이지 2 로딩 중...
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+  [krca**** / 2026.03.20] 코에르 부속품 모음...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [na**** / 2026.03.20] 코에르 스텐 욕실선반 무타공 화장실 ...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+    스크롤 이동: .ag-body-viewport
+  [진행] 스크롤 10회 / 성공 47 / 실패 3 / 남은 29
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+  [to**** / 2026.03.19] [세트] 코에르 테라조 3종 세트 (...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+  [진행] 스크롤 20회 / 성공 48 / 실패 3 / 남은 28
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+  [진행] 스크롤 30회 / 성공 48 / 실패 3 / 남은 28
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+  [진행] 스크롤 40회 / 성공 48 / 실패 3 / 남은 28
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+  [진행] 스크롤 50회 / 성공 48 / 실패 3 / 남은 28
+  [yang***** / 2026.03.13] [세트] 코에르 테라조 5종 세트 (...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [진행] 스크롤 50회 / 성공 49 / 실패 3 / 남은 27
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+  [pure******** / 2026.03.12] 코에르 테라조 고급 욕실 드라이 트레...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [ssw0**** / 2026.03.12] 코에르 스텐 욕실선반 무타공 화장실 ...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+  [진행] 스크롤 60회 / 성공 51 / 실패 3 / 남은 25
+  [tjsg***** / 2026.03.12] 코에르 스텐 욕실선반 무타공 화장실 ...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [진행] 스크롤 60회 / 성공 52 / 실패 3 / 남은 24
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+  [nams**** / 2026.03.10] [세트] 코에르 스테인리스 2종 세트...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+  [진행] 스크롤 70회 / 성공 53 / 실패 3 / 남은 23
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+  [jump**** / 2026.03.08] 코에르 테라조 멀티홀더 칫솔꽂이 치약...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+    스크롤 이동: .ag-body-viewport
+  [진행] 스크롤 80회 / 성공 54 / 실패 3 / 남은 22
+  [jump**** / 2026.03.07] 코에르 테라조 고급 욕실 트레이 받침...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-untouched ng-valid ng-not-empty ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [진행] 스크롤 80회 / 성공 55 / 실패 3 / 남은 21
+  [qkqn***** / 2026.03.07] 코에르 스텐 욕실선반 무타공 화장실 ...   [모달상태] TA:4개 모달:1개 editable:0개
+    textarea[0]: {"readonly":true,"disabled":false,"classes":"form-control ng-pristine ng-valid ng-not-empty ng-valid-requ","rect":"250,817,426,85","value":"4952411333,4952380780,49523685"}
+    modal[0]: {"tag":"DIV","cls":"modal fade seller-layer-modal mobile-full data-target-review","visible":true}
+✓
+  [진행] 스크롤 80회 / 성공 56 / 실패 3 / 남은 20
+    스크롤 이동: .ag-body-viewport
+    스크롤 이동: .ag-body-viewport
+  [an**** / 2026.03.07] [세트] 코에르 테라조 2종 세트 (... 

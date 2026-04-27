@@ -1,0 +1,184 @@
+{
+  "selectCount": 4,
+  "selects": [
+    {
+      "name": "",
+      "id": "",
+      "class": "ng-pristine ng-untouched ng-valid selectized ng-valid-required ng-empty",
+      "options": [
+        "대분류"
+      ]
+    },
+    {
+      "name": "",
+      "id": "",
+      "class": "ng-pristine ng-untouched ng-valid selectized ng-valid-required ng-empty",
+      "options": [
+        "중분류"
+      ]
+    },
+    {
+      "name": "",
+      "id": "",
+      "class": "ng-pristine ng-untouched ng-valid selectized ng-valid-required ng-empty",
+      "options": [
+        "소분류"
+      ]
+    },
+    {
+      "name": "",
+      "id": "",
+      "class": "ng-pristine ng-untouched ng-valid selectized ng-valid-required ng-empty",
+      "options": [
+        "세분류"
+      ]
+    }
+  ],
+  "matSelectCount": 0,
+  "matSelects": [],
+  "comboboxCount": 0,
+  "comboboxes": [],
+  "hasReplyFilter": true,
+  "hasUnregistered": false,
+  "hasUnregisteredInDOM": true,
+  "replyFilterEls": [
+    {
+      "tag": "DIV",
+      "class": "form-inline",
+      "text": "구매자평점전체 1점2점3점4점5점답글여부답글여부(선택없음)답글등록답글미등록",
+      "html": "<div class=\"form-inline\"><div class=\"pc-inline-block\"><div class=\"form-group mg-right-lg\">구매자평점</div><div class=\"form-group\"><div class=\"seller-input\"><label><input data-checklist-value=\"''\" name=\"reviewScores\" ng-checked=\"vm.func.isAllCheckedBySearchCondition(vm.searchFormData.viewData, 'reviewScor",
+      "parentHTML": "<div class=\"input-content\"><div class=\"form-inline\"><div class=\"pc-inline-block\"><div class=\"form-group mg-right-lg\">구매자평점</div><div class=\"form-group\"><div class=\"seller-input\"><label><input data-checklist-value=\"''\" name=\"reviewScores\" ng-checked=\"vm.func.isAllCheckedBySearchCondition(vm.searchFormData.viewData, 'reviewScores')\" ng-click=\"vm.func.checkAllBySearchCondition(vm.searchFormData.viewD"
+    },
+    {
+      "tag": "DIV",
+      "class": "pc-inline-block",
+      "text": "답글여부답글여부(선택없음)답글등록답글미등록",
+      "html": "<div class=\"pc-inline-block\"><div class=\"form-group\">답글여부</div><div class=\"form-group\"><div class=\"selectize-control ng-pristine ng-untouched ng-valid single\"><div class=\"selectize-input items not-full ng-valid ng-pristine has-options\"><input type=\"text\" autocomplete=\"off\" tabindex=\"0\" placeholder=\"",
+      "parentHTML": "<div class=\"form-inline\"><div class=\"pc-inline-block\"><div class=\"form-group mg-right-lg\">구매자평점</div><div class=\"form-group\"><div class=\"seller-input\"><label><input data-checklist-value=\"''\" name=\"reviewScores\" ng-checked=\"vm.func.isAllCheckedBySearchCondition(vm.searchFormData.viewData, 'reviewScores')\" ng-click=\"vm.func.checkAllBySearchCondition(vm.searchFormData.viewData, vm.config, 'reviewScor"
+    },
+    {
+      "tag": "DIV",
+      "class": "form-group",
+      "text": "답글여부",
+      "html": "<div class=\"form-group\">답글여부</div>",
+      "parentHTML": "<div class=\"pc-inline-block\"><div class=\"form-group\">답글여부</div><div class=\"form-group\"><div class=\"selectize-control ng-pristine ng-untouched ng-valid single\"><div class=\"selectize-input items not-full ng-valid ng-pristine has-options\"><input type=\"text\" autocomplete=\"off\" tabindex=\"0\" placeholder=\"선택안함\" readonly=\"\" style=\"width: 45.4844px;\"></div><div class=\"selectize-dropdown single ng-pristine "
+    }
+  ],
+  "unregisteredEls": [
+    {
+      "tag": "DIV",
+      "class": "pc-inline-block",
+      "text": "답글여부답글여부(선택없음)답글등록답글미등록",
+      "html": "<div class=\"pc-inline-block\"><div class=\"form-group\">답글여부</div><div class=\"form-group\"><div class=\"selectize-control ng-pristine ng-untouched ng-valid single\"><div class=\"selectize-input items not-ful"
+    },
+    {
+      "tag": "DIV",
+      "class": "form-group",
+      "text": "답글여부(선택없음)답글등록답글미등록",
+      "html": "<div class=\"form-group\"><div class=\"selectize-control ng-pristine ng-untouched ng-valid single\"><div class=\"selectize-input items not-full ng-valid ng-pristine has-options\"><input type=\"text\" autocomp"
+    },
+    {
+      "tag": "DIV",
+      "class": "selectize-control ng-pristine ng-untouched ng-valid single",
+      "text": "답글여부(선택없음)답글등록답글미등록",
+      "html": "<div class=\"selectize-control ng-pristine ng-untouched ng-valid single\"><div class=\"selectize-input items not-full ng-valid ng-pristine has-options\"><input type=\"text\" autocomplete=\"off\" tabindex=\"0\" "
+    },
+    {
+      "tag": "DIV",
+      "class": "selectize-dropdown single ng-pristine ng-untouched ng-valid",
+      "text": "답글여부(선택없음)답글등록답글미등록",
+      "html": "<div class=\"selectize-dropdown single ng-pristine ng-untouched ng-valid\" style=\"display: none; width: 206px; top: 34px; left: 0px;\"><div class=\"selectize-dropdown-content\"><div data-value=\"null\" data-"
+    },
+    {
+      "tag": "DIV",
+      "class": "selectize-dropdown-content",
+      "text": "답글여부(선택없음)답글등록답글미등록",
+      "html": "<div class=\"selectize-dropdown-content\"><div data-value=\"null\" data-selectable=\"\" class=\"option active\">답글여부(선택없음)</div><div data-value=\"true\" data-selectable=\"\" class=\"option\">답글등록</div><div data-val"
+    }
+  ],
+  "selectClassEls": [
+    {
+      "tag": "DIV",
+      "class": "selectize-control ng-pristine ng-untouched ng-valid single",
+      "text": "수취인명수취인명구매자명구매자연락처구매자ID주문번호상품주문번호상품번호운송장",
+      "html": "<div class=\"selectize-control ng-pristine ng-untouched ng-valid single\"><div class=\"selectize-input items required ng-valid ng-pristine full has-optio"
+    },
+    {
+      "tag": "DIV",
+      "class": "selectize-input items required ng-valid ng-pristine full has-options has-items",
+      "text": "수취인명",
+      "html": "<div class=\"selectize-input items required ng-valid ng-pristine full has-options has-items\"><div data-value=\"COLLECTOR_NAME\" class=\"item\">수취인명</div><i"
+    },
+    {
+      "tag": "LI",
+      "class": "selected",
+      "text": "리뷰 관리",
+      "html": "<li ng-class=\"{'selected': vm.currentMenu2d.state === menu2d.state, 'title-group': menu2d.menuType === 'GROUP', 'divider': menu2d.menuType === 'GROUP_"
+    },
+    {
+      "tag": "DIV",
+      "class": "selectize-control ng-pristine ng-untouched ng-valid single",
+      "text": "대분류대분류가구/인테리어도서디지털/가전생활/건강스포츠/레저식품여가/생활편",
+      "html": "<div class=\"selectize-control ng-pristine ng-untouched ng-valid single\"><div class=\"selectize-input items full has-options has-items ng-valid ng-prist"
+    },
+    {
+      "tag": "DIV",
+      "class": "selectize-input items full has-options has-items ng-valid ng-pristine",
+      "text": "대분류",
+      "html": "<div class=\"selectize-input items full has-options has-items ng-valid ng-pristine\"><div data-value=\"\" class=\"item\">대분류</div><input type=\"text\" autocom"
+    },
+    {
+      "tag": "DIV",
+      "class": "selectize-control ng-pristine ng-untouched ng-valid single",
+      "text": "중분류중분류",
+      "html": "<div class=\"selectize-control ng-pristine ng-untouched ng-valid single\"><div class=\"selectize-input items full has-options has-items ng-valid ng-prist"
+    },
+    {
+      "tag": "DIV",
+      "class": "selectize-input items full has-options has-items ng-valid ng-pristine disabled",
+      "text": "중분류",
+      "html": "<div class=\"selectize-input items full has-options has-items ng-valid ng-pristine disabled\"><div data-value=\"\" class=\"item\">중분류</div><input type=\"text"
+    },
+    {
+      "tag": "DIV",
+      "class": "selectize-control ng-pristine ng-untouched ng-valid single",
+      "text": "소분류소분류",
+      "html": "<div class=\"selectize-control ng-pristine ng-untouched ng-valid single\"><div class=\"selectize-input items full has-options has-items ng-valid ng-prist"
+    },
+    {
+      "tag": "DIV",
+      "class": "selectize-input items full has-options has-items ng-valid ng-pristine disabled",
+      "text": "소분류",
+      "html": "<div class=\"selectize-input items full has-options has-items ng-valid ng-pristine disabled\"><div data-value=\"\" class=\"item\">소분류</div><input type=\"text"
+    },
+    {
+      "tag": "DIV",
+      "class": "selectize-control ng-pristine ng-untouched ng-valid single",
+      "text": "답글여부(선택없음)답글등록답글미등록",
+      "html": "<div class=\"selectize-control ng-pristine ng-untouched ng-valid single\"><div class=\"selectize-input items not-full ng-valid ng-pristine has-options\"><"
+    }
+  ],
+  "url": "https://sell.smartstore.naver.com/#/review/search",
+  "buttons": [
+    "알림",
+    "할 일",
+    "솔루션",
+    "도움말",
+    "톡톡상담",
+    "구매 확률 4배 높여주는 리뷰 알아보기!",
+    "오늘",
+    "1주일",
+    "1개월",
+    "3개월",
+    "6개월",
+    "1년",
+    "검색",
+    "초기화",
+    "엑셀다운",
+    "TIP",
+    "TIP",
+    "TIP",
+    "TIP",
+    "TIP"
+  ]
+}

@@ -1,0 +1,18 @@
+# 비밀 정보 (절대 커밋 금지)
+config.js
+.seller_session.json
+
+# 실행 결과 / 캐시
+.review_summary.json
+.posting.lock
+holidays_cache.json
+logs/
+reply/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# OS
+Thumbs.db
+.DS_Store

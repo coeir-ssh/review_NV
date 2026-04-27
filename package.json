@@ -1,0 +1,15 @@
+{
+  "name": "review-collector",
+  "version": "1.0.0",
+  "description": "네이버 스마트스토어 리뷰 수집 프로그램",
+  "main": "collect_reviews.js",
+  "scripts": {
+    "start": "node collect_reviews.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.87.0",
+    "docx": "^9.6.1",
+    "puppeteer": "^24.40.0",
+    "xlsx": "^0.18.5"
+  }
+}
