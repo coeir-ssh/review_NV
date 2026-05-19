@@ -9,6 +9,42 @@ const path      = require('path');
 const fs        = require('fs');
 const https     = require('https');
 const cfg       = require('./config');
+const { getMasterProductName, inferOption } = require('./master_product_names');
+function resolveDisplayOption(r) {
+  return (r.optionName && r.optionName.trim()) || inferOption(r.productName) || '';
+}
+const REASON_CONFIDENCE_THRESHOLD = 90;
+function shouldShowJudgeReason(r) {
+  if (!r.judgeReason) return false;
+  if (r.judgeLabel === '환불검토') return true;
+  if (r.judgeConfidence != null && r.judgeConfidence < REASON_CONFIDENCE_THRESHOLD) return true;
+  return false;
+}
+function rankSortKey(p) {
+  if (typeof p === 'number' && p > 0) return p;
+  if (p === -2) return 9999;
+  return 99999;
+}
+function sortByRank(list) {
+  return [...list].sort((a, b) => rankSortKey(a.reviewPosition) - rankSortKey(b.reviewPosition));
+}
+
+function normalizeReviewText(text) {
+  return (text || '')
+    .replace(/[\u{1F000}-\u{1FFFF}\u{2300}-\u{27FF}\u{FE00}-\u{FEFF}\u{1FA00}-\u{1FAFF}]/gu, '')
+    .replace(/[…⋯⋮]/g, '.')
+    .replace(/\.{2,}/g, '.')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+function koreanOnlyKey(text) {
+  return (text || '').replace(/[^가-힣]/g, '');
+}
+function formatReviewPosition(p) {
+  if (p > 0) return `${p}위`;
+  if (p === -2) return '100위 밖';
+  return '미확인';
+}
 const {
   Document, Packer, Paragraph, TextRun,
   AlignmentType, BorderStyle, ShadingType,
@@ -44,7 +80,7 @@ function findProductNaverId(productName) {
 }
 
 // ── brand.naver.com 순위 조회 ────────────────────────────
-async function findReviewPosition(browser, productName, reviewText) {
+async function findReviewPosition(browser, productName, reviewText, writer) {
   if (!reviewText || reviewText.trim().length < 3) {
     return { position: -1, policy: '리뷰 내용 없음', productUrl: null };
   }
@@ -55,7 +91,8 @@ async function findReviewPosition(browser, productName, reviewText) {
 
   const { urlId, originProductNo, checkoutMerchantNo } = productInfo;
   const productUrl   = `https://brand.naver.com/coeir/products/${urlId}`;
-  const matchSnippet = reviewText.replace(/\s+/g, ' ').trim().substring(0, 20);
+  const matchSnippet = normalizeReviewText(reviewText).substring(0, 30);
+  const matchKor     = koreanOnlyKey(matchSnippet);
 
   const reviewPage = await browser.newPage();
   try {
@@ -63,11 +100,14 @@ async function findReviewPosition(browser, productName, reviewText) {
     await reviewPage.goto(productUrl + '#REVIEW', { waitUntil: 'networkidle2', timeout: 30000 });
     await sleep(2000);
 
-    const API_URL = 'https://brand.naver.com/n/v1/contents/reviews/query-pages';
+    const API_URL   = 'https://brand.naver.com/n/v1/contents/reviews/query-pages';
+    const PAGE_SIZE = 20;
+    const TOP_LIMIT = 100;
+    const MAX_PAGES = Math.ceil(TOP_LIMIT / PAGE_SIZE);
     let globalPos = 0, foundPos = -1;
 
-    for (let p = 1; p <= 100; p++) {
-      const body = { checkoutMerchantNo, originProductNo, page: p, pageSize: 20, reviewSearchSortType: 'REVIEW_RANKING' };
+    for (let p = 1; p <= MAX_PAGES; p++) {
+      const body = { checkoutMerchantNo, originProductNo, page: p, pageSize: PAGE_SIZE, reviewSearchSortType: 'REVIEW_RANKING' };
       const result = await reviewPage.evaluate(async (url, reqBody) => {
         try {
           const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(reqBody) });
@@ -82,24 +122,42 @@ async function findReviewPosition(browser, productName, reviewText) {
 
       for (const rv of reviews) {
         globalPos++;
-        const text = (rv.reviewContent || rv.body || rv.content || '').replace(/\s+/g, ' ').trim();
-        if (text.includes(matchSnippet) || (matchSnippet.length > 5 && matchSnippet.includes(text.substring(0, 10)))) {
-          foundPos = globalPos; break;
-        }
+        if (globalPos > TOP_LIMIT) break;
+        const rawText = rv.reviewContent || rv.reviewBody || rv.body || rv.content || rv.reviewText || rv.text || '';
+        const normText = normalizeReviewText(rawText);
+        const normKor  = koreanOnlyKey(normText);
+        const apiWriter = (rv.writerMemberId || rv.writerId || rv.maskedWriterId || rv.memberMaskingId || rv.writer || '').toString();
+        const writerMatched = writer && apiWriter && (
+          apiWriter === writer || apiWriter.replace(/\*/g, '') === writer.replace(/\*/g, '')
+        );
+        const textMatched =
+          normText.includes(matchSnippet) ||
+          matchSnippet.includes(normText.substring(0, 15)) ||
+          normText.includes(matchSnippet.substring(0, 15)) ||
+          (matchKor.length >= 4 && normKor.length >= 4 && (
+            normKor.startsWith(matchKor) ||
+            matchKor.startsWith(normKor.substring(0, Math.min(matchKor.length, normKor.length)))
+          ));
+        const matched = textMatched && (matchKor.length >= 7 || writerMatched || !writer);
+        if (matched) { foundPos = globalPos; break; }
       }
-      if (foundPos > 0) break;
+      if (foundPos > 0 || globalPos >= TOP_LIMIT) break;
       const total = result.totalCount || result.totalElements || 0;
       if (total > 0 && globalPos >= total) break;
       await sleep(300);
     }
 
-    const policy = foundPos <= 0 ? null
+    if (foundPos <= 0) foundPos = (globalPos > 0) ? -2 : -1;
+    const outOfTop100 = (foundPos === -2);
+
+    const policy = foundPos === -2 ? '✅ 100위 밖 → 답변으로 충분'
+      : foundPos <= 0 ? null
       : foundPos <= 10 ? '⚠️ 1~10위 → 아주 적극 대응 (조건 환불 검토)'
       : foundPos <= 20 ? '🔶 11~20위 → 적극 대응 (답변 or 환불)'
       : foundPos <= 40 ? '🔷 21~40위 → 답변 우선 (필요시 환불)'
       :                  '✅ 41위 이하 → 답변으로 충분';
 
-    log(`    → ${foundPos > 0 ? `${foundPos}위` : '미발견'} / 검색: ${globalPos}개`);
+    log(`    → ${foundPos > 0 ? `${foundPos}위` : outOfTop100 ? '100위 밖' : '미발견'} / 검색: ${globalPos}개`);
     return { position: foundPos, policy, productUrl };
   } catch(e) {
     return { position: -1, policy: null, productUrl };
@@ -113,7 +171,7 @@ function generateExcel(results, dateStr) {
   const data = results.map(r => ({
     '리뷰글번호': r.reviewNo,
     '상품명':     r.productName,
-    '리뷰순위':   r.reviewPosition > 0 ? `${r.reviewPosition}위` : '미확인',
+    '리뷰순위':   formatReviewPosition(r.reviewPosition),
     '구매자평점': r.rating,
     '리뷰등록일': r.date,
     '리뷰내용':   r.reviewText,
@@ -179,20 +237,20 @@ async function generateWordDoc(summary, dateStr) {
 
     // ── 답변 완료
     new Paragraph({ spacing: { before: 200, after: 160 }, children: [label('■ 답변 완료 항목', true, 24)] }),
-    ...summary.results.filter(r => r.replyText).flatMap((r, i) => [
+    ...sortByRank(summary.results.filter(r => r.replyText)).flatMap((r, i) => [
       new Paragraph({ spacing: { before: 200, after: 80 }, shading: { fill: GRAY, type: ShadingType.CLEAR }, children: [label(`No.${i + 1}`, true, 22)] }),
       new Paragraph({ spacing: { after: 60 }, children: [label('리뷰글번호 : ', true), label(r.reviewNo || '-')] }),
       new Paragraph({ spacing: { after: 60 }, children: [label('등록자 : ', true), label(r.writer)] }),
-      new Paragraph({ spacing: { after: 60 }, children: [label('제품명 : ', true), label(r.productName)] }),
-      ...(r.optionName ? [new Paragraph({ spacing: { after: 60 }, children: [label('구매 옵션 : ', true), label(r.optionName)] })] : []),
-      new Paragraph({
-        spacing: { after: 60 },
-        children: [label('리뷰 : ', true), new TextRun({ text: `"${r.reviewText.replace(/\n/g, ' ')}"`, font: 'Malgun Gothic', size: 22, italics: true })],
-      }),
+      new Paragraph({ spacing: { after: 60 }, children: [label('제품명 : ', true), label(getMasterProductName(r.productName))] }),
+      ...((opt => opt ? [new Paragraph({ spacing: { after: 60 }, children: [label('구매 옵션 : ', true), label(opt)] })] : [])(resolveDisplayOption(r))),
       new Paragraph({ spacing: { after: 60 }, children: [label('별점 : ', true), label(`${stars(r.rating)} (${r.rating}점)`)] }),
       new Paragraph({
         spacing: { after: 60 },
-        children: [label('리뷰순위 : ', true), new TextRun({ text: r.reviewPosition > 0 ? `${r.reviewPosition}위` : '미확인', font: 'Malgun Gothic', size: 22, bold: true, color: '1F3864' })],
+        children: [label('리뷰순위 : ', true), new TextRun({ text: formatReviewPosition(r.reviewPosition), font: 'Malgun Gothic', size: 22, bold: true, color: r.reviewPosition === -2 ? '888888' : '1F3864' })],
+      }),
+      new Paragraph({
+        spacing: { after: 60 },
+        children: [label('리뷰 : ', true), new TextRun({ text: `"${r.reviewText.replace(/\n/g, ' ')}"`, font: 'Malgun Gothic', size: 22, italics: true })],
       }),
       ...(r.judgeLabel ? [new Paragraph({
         spacing: { after: 60 },
@@ -201,7 +259,8 @@ async function generateWordDoc(summary, dateStr) {
           new TextRun({ text: r.judgeLabel, bold: true, size: 22, font: 'Malgun Gothic', color: r.judgeLabel === '환불검토' ? 'C00000' : '2E7D32' }),
         ],
       })] : []),
-      ...(r.judgeReason ? [new Paragraph({
+      // 판단 근거: 환불검토 + 답변이라도 confidence 낮으면(< 90) 표시
+      ...(shouldShowJudgeReason(r) ? [new Paragraph({
         spacing: { after: 60 },
         children: [
           new TextRun({ text: '💭 판단 근거 : ', bold: true, size: 22, font: 'Malgun Gothic', color: 'C00000' }),
@@ -219,23 +278,24 @@ async function generateWordDoc(summary, dateStr) {
 
     // ── 환불검토
     ...(() => {
-      const list = summary.results.filter(r => r.refundCheck === '검토필요');
+      const list = sortByRank(summary.results.filter(r => r.refundCheck === '검토필요'));
       if (!list.length) return [];
       return [
         new Paragraph({ spacing: { before: 200, after: 160 }, children: [label('⚠️ 환불검토 필요 항목', true, 24)] }),
         ...list.flatMap((r, i) => [
           new Paragraph({ spacing: { before: 160, after: 80 }, shading: { fill: 'FFF2CC', type: ShadingType.CLEAR }, children: [label(`No.${i + 1}   ${stars(r.rating)} (${r.rating}점)   |   ${r.writer}`, true)] }),
           new Paragraph({ spacing: { after: 60 }, children: [label('리뷰글번호 : ', true), label(r.reviewNo || '-')] }),
-          new Paragraph({ spacing: { after: 60 }, children: [label('제품명 : ', true), label(r.productName)] }),
-          ...(r.optionName ? [new Paragraph({ spacing: { after: 60 }, children: [label('구매 옵션 : ', true), label(r.optionName)] })] : []),
-          new Paragraph({ spacing: { after: 60 }, children: [label('리뷰 : ', true), new TextRun({ text: `"${r.reviewText.replace(/\n/g, ' ')}"`, font: 'Malgun Gothic', size: 22, italics: true })] }),
+          new Paragraph({ spacing: { after: 60 }, children: [label('제품명 : ', true), label(getMasterProductName(r.productName))] }),
+          ...((opt => opt ? [new Paragraph({ spacing: { after: 60 }, children: [label('구매 옵션 : ', true), label(opt)] })] : [])(resolveDisplayOption(r))),
+          new Paragraph({ spacing: { after: 60 }, children: [label('별점 : ', true), label(`${stars(r.rating)} (${r.rating}점)`)] }),
           ...(r.reviewPosition > 0 ? [
             new Paragraph({ spacing: { after: 60 }, children: [label('📍 리뷰 순위 : ', true), new TextRun({ text: `${r.reviewPosition}위 (랭킹순)`, font: 'Malgun Gothic', size: 22, bold: true, color: 'C00000' })] }),
             new Paragraph({ spacing: { after: 60 }, children: [label('📋 대응 정책 : ', true), new TextRun({ text: r.refundPolicy || '', font: 'Malgun Gothic', size: 22, bold: true, color: '833C00' })] }),
           ] : [
-            new Paragraph({ spacing: { after: 60 }, children: [label('리뷰순위 : ', true), new TextRun({ text: '미확인', font: 'Malgun Gothic', size: 22 })] }),
+            new Paragraph({ spacing: { after: 60 }, children: [label('리뷰순위 : ', true), new TextRun({ text: formatReviewPosition(r.reviewPosition), font: 'Malgun Gothic', size: 22, color: r.reviewPosition === -2 ? '888888' : '000000' })] }),
             ...(r.refundPolicy ? [new Paragraph({ spacing: { after: 60 }, children: [label('📋 대응 정책 : ', true), label(r.refundPolicy)] })] : []),
           ]),
+          new Paragraph({ spacing: { after: 60 }, children: [label('리뷰 : ', true), new TextRun({ text: `"${r.reviewText.replace(/\n/g, ' ')}"`, font: 'Malgun Gothic', size: 22, italics: true })] }),
           ...(r.judgeLabel ? [new Paragraph({ spacing: { after: 60 }, children: [
             new TextRun({ text: '🏷️ 판단 : ', bold: true, size: 22, font: 'Malgun Gothic' }),
             new TextRun({ text: r.judgeLabel, bold: true, size: 22, font: 'Malgun Gothic', color: r.judgeLabel === '환불검토' ? 'C00000' : '2E7D32' }),
@@ -259,7 +319,7 @@ async function generateWordDoc(summary, dateStr) {
         new Paragraph({ spacing: { before: 200, after: 160 }, children: [label('❌ 답변 실패 항목', true, 24)] }),
         ...list.flatMap((r, i) => [
           new Paragraph({ spacing: { before: 160, after: 80 }, shading: { fill: 'FCE4D6', type: ShadingType.CLEAR }, children: [label(`No.${i + 1}   ${stars(r.rating)} (${r.rating}점)   |   ${r.writer}`, true)] }),
-          new Paragraph({ spacing: { after: 60 }, children: [label('제품명 : ', true), label(r.productName)] }),
+          new Paragraph({ spacing: { after: 60 }, children: [label('제품명 : ', true), label(getMasterProductName(r.productName))] }),
           new Paragraph({ spacing: { after: 160 }, children: [label('리뷰 : ', true), new TextRun({ text: `"${r.reviewText.replace(/\n/g, ' ')}"`, font: 'Malgun Gothic', size: 22, italics: true })] }),
         ]),
         divider(),
@@ -284,6 +344,46 @@ async function generateWordDoc(summary, dateStr) {
 }
 
 // ── Slack 전송 ───────────────────────────────────────────
+// 워드 파일을 슬랙 채널에 업로드
+async function uploadFileToSlack(filepath, channelId, comment = '') {
+  const token = cfg.SLACK_BOT_TOKEN;
+  if (!token || !channelId || !fs.existsSync(filepath)) { log('[슬랙 파일] 스킵'); return; }
+  const filename = path.basename(filepath);
+  const fileBuf  = fs.readFileSync(filepath);
+  const length   = fileBuf.length;
+  const httpsReq = (opts, body) => new Promise((resolve, reject) => {
+    const req = https.request(opts, res => {
+      let data=''; res.on('data', c => data+=c); res.on('end', () => resolve({status:res.statusCode, body:data}));
+    });
+    req.on('error', reject);
+    if (body) req.write(body);
+    req.end();
+  });
+  try {
+    const step1Body = `filename=${encodeURIComponent(filename)}&length=${length}`;
+    const step1 = await httpsReq({
+      hostname:'slack.com', path:'/api/files.getUploadURLExternal', method:'POST',
+      headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/x-www-form-urlencoded','Content-Length':Buffer.byteLength(step1Body)},
+    }, step1Body);
+    const j1 = JSON.parse(step1.body);
+    if (!j1.ok) { log(`[슬랙 파일] URL 발급 실패: ${j1.error}`); return; }
+    const url = new URL(j1.upload_url);
+    const step2 = await httpsReq({
+      hostname:url.hostname, path:url.pathname+url.search, method:'POST',
+      headers:{'Content-Type':'application/octet-stream','Content-Length':length},
+    }, fileBuf);
+    if (step2.status >= 400) { log(`[슬랙 파일] 업로드 HTTP ${step2.status}`); return; }
+    const step3Body = JSON.stringify({files:[{id:j1.file_id,title:filename}],channel_id:channelId,initial_comment:comment||''});
+    const step3 = await httpsReq({
+      hostname:'slack.com', path:'/api/files.completeUploadExternal', method:'POST',
+      headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json; charset=utf-8','Content-Length':Buffer.byteLength(step3Body)},
+    }, step3Body);
+    const j3 = JSON.parse(step3.body);
+    if (j3.ok) log(`[슬랙 파일] 업로드 완료: ${filename}`);
+    else       log(`[슬랙 파일] 게시 실패: ${j3.error}`);
+  } catch (e) { log(`[슬랙 파일] 오류: ${e.message}`); }
+}
+
 async function sendSlack(summary) {
   const token     = cfg.SLACK_BOT_TOKEN;
   const channelId = cfg.SLACK_CHANNEL_ID || cfg.SLACK_USER_ID;
@@ -308,22 +408,23 @@ async function sendSlack(summary) {
   lines.push(``);
 
   // 답변 완료
-  const repliedList = summary.results.filter(r => r.replyText);
+  const repliedList = sortByRank(summary.results.filter(r => r.replyText));
   if (repliedList.length > 0) {
     repliedList.forEach((r, i) => {
       lines.push(`─────────────────────────────`);
       lines.push(`No.${i + 1}`);
       lines.push(`리뷰글번호 : ${r.reviewNo || '-'}`);
       lines.push(`등록자 : ${r.writer}`);
-      lines.push(`제품명 : ${r.productName}`);
-      if (r.optionName) lines.push(`구매 옵션 : ${r.optionName}`);
-      lines.push(`리뷰 : "${r.reviewText.replace(/\n/g, ' ')}"`);
+      lines.push(`제품명 : ${getMasterProductName(r.productName)}`);
+      { const opt = resolveDisplayOption(r); if (opt) lines.push(`구매 옵션 : ${opt}`); }
       lines.push(`별점 : ${stars(r.rating)} (${r.rating}점)`);
-      lines.push(`리뷰순위 : ${r.reviewPosition > 0 ? `${r.reviewPosition}위` : '미확인'}`);
+      lines.push(`리뷰순위 : ${formatReviewPosition(r.reviewPosition)}`);
+      lines.push(`리뷰 : "${r.reviewText.replace(/\n/g, ' ')}"`);
       if (r.judgeLabel) {
         lines.push(`*🏷️ 판단 : ${r.judgeLabel}*`);
       }
-      if (r.judgeReason) {
+      // 판단 근거: 환불검토 + 답변이라도 confidence 낮으면(< 90) 표시
+      if (shouldShowJudgeReason(r)) {
         lines.push(`*🔴 판단 근거 : ${r.judgeReason}${r.judgeConfidence != null ? ` (confidence ${r.judgeConfidence})` : ''}*`);
       }
       lines.push(`답변 : "${r.replyText}"`);
@@ -332,18 +433,19 @@ async function sendSlack(summary) {
   }
 
   // 환불검토
-  const refundList = summary.results.filter(r => r.refundCheck === '검토필요');
+  const refundList = sortByRank(summary.results.filter(r => r.refundCheck === '검토필요'));
   if (refundList.length > 0) {
     lines.push(`─────────────────────────────`);
     lines.push(`⚠️ 환불검토 필요 항목 (${refundList.length}건)`);
     refundList.forEach((r, i) => {
       lines.push(`No.${i + 1}  ${stars(r.rating)} (${r.rating}점)  |  ${r.writer}`);
       lines.push(`리뷰글번호 : ${r.reviewNo || '-'}`);
-      lines.push(`제품명 : ${r.productName}`);
-      if (r.optionName) lines.push(`구매 옵션 : ${r.optionName}`);
-      lines.push(`리뷰 : "${r.reviewText.replace(/\n/g, ' ')}"`);
-      lines.push(`리뷰순위 : ${r.reviewPosition > 0 ? `${r.reviewPosition}위` : '미확인'}`);
+      lines.push(`제품명 : ${getMasterProductName(r.productName)}`);
+      { const opt = resolveDisplayOption(r); if (opt) lines.push(`구매 옵션 : ${opt}`); }
+      lines.push(`별점 : ${stars(r.rating)} (${r.rating}점)`);
+      lines.push(`리뷰순위 : ${formatReviewPosition(r.reviewPosition)}`);
       lines.push(`📋 대응 정책 : ${r.refundPolicy || '미확인'}`);
+      lines.push(`리뷰 : "${r.reviewText.replace(/\n/g, ' ')}"`);
       if (r.judgeLabel) {
         lines.push(`*🏷️ 판단 : ${r.judgeLabel}*`);
       }
@@ -361,7 +463,7 @@ async function sendSlack(summary) {
     lines.push(`❌ 답변 실패 항목 (${failList.length}건)`);
     failList.forEach((r, i) => {
       lines.push(`No.${i + 1}  ${stars(r.rating)} (${r.rating}점)  |  ${r.writer}`);
-      lines.push(`제품명 : ${r.productName}`);
+      lines.push(`제품명 : ${getMasterProductName(r.productName)}`);
       lines.push(`리뷰 : "${r.reviewText.replace(/\n/g, ' ')}"`);
       lines.push(``);
     });
@@ -418,8 +520,8 @@ async function main() {
     log(`\n[${i + 1}/${summary.results.length}] ${r.writer} | ${r.productName?.substring(0, 25)}`);
     log(`  리뷰: "${r.reviewText?.substring(0, 40)}"`);
 
-    const pos = await findReviewPosition(browser, r.productName, r.reviewText);
-    r.reviewPosition = pos.position > 0 ? pos.position : 0;
+    const pos = await findReviewPosition(browser, r.productName, r.reviewText, r.writer);
+    r.reviewPosition = pos.position > 0 ? pos.position : (pos.position === -2 ? -2 : 0);
     r.productUrl     = pos.productUrl || '';
 
     // 정책은 환불검토 대상만
@@ -444,16 +546,26 @@ async function main() {
 
   // Word 재생성
   log('[Word] 재생성 중...');
-  const { filename: docxFile } = await generateWordDoc(summary, dateStr);
+  const { filename: docxFile, filepath: docxFilepath } = await generateWordDoc(summary, dateStr);
   log(`  → ${docxFile}`);
 
   // Slack 재전송
   log('[슬랙] 전송 중...');
   await sendSlack(summary);
 
+  // Slack 채널에 워드 파일 첨부 업로드
+  const channelId = cfg.SLACK_CHANNEL_ID || cfg.SLACK_USER_ID;
+  if (docxFilepath && channelId) {
+    await uploadFileToSlack(docxFilepath, channelId, `📎 ${summary.date} 보고서 워드 파일`);
+  }
+
   // 요약 JSON 업데이트
   fs.writeFileSync(summaryFile, JSON.stringify(summary, null, 2));
   log('\n✅ 완료');
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+module.exports = { generateWordDoc, generateExcel, sendSlack };
+
+if (require.main === module) {
+  main().catch(e => { console.error(e); process.exit(1); });
+}

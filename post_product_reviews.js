@@ -19,6 +19,40 @@ const path       = require('path');
 const fs         = require('fs');
 const https      = require('https');
 const cfg        = require('./config');
+const { getMasterProductName, inferOption } = require('./master_product_names');
+
+// 리뷰순위 표시 헬퍼: 양수=N위 / -2=100위 밖 / 그 외=미확인
+function formatReviewPosition(p) {
+  if (p > 0) return `${p}위`;
+  if (p === -2) return '100위 밖';
+  return '미확인';
+}
+
+// 표시용 옵션: AG Grid 에서 잡힌 buyer 옵션 우선, 없으면 풀네임에서 추출한 변형명
+function resolveDisplayOption(r) {
+  return (r.optionName && r.optionName.trim()) || inferOption(r.productName) || '';
+}
+
+// 리뷰 순위 정렬 키: 1~N → N, 100위 밖(-2) → 9999, 미확인(0/-1) → 99999
+function rankSortKey(p) {
+  if (typeof p === 'number' && p > 0) return p;
+  if (p === -2) return 9999;
+  return 99999;
+}
+function sortByRank(list) {
+  return [...list].sort((a, b) => rankSortKey(a.reviewPosition) - rankSortKey(b.reviewPosition));
+}
+
+// 판단 근거 표시 여부:
+// - 환불검토는 항상 표시
+// - 답변이라도 confidence 가 낮으면(< 90) 애매한 케이스로 보고 표시
+const REASON_CONFIDENCE_THRESHOLD = 90;
+function shouldShowJudgeReason(r) {
+  if (!r.judgeReason) return false;
+  if (r.judgeLabel === '환불검토') return true;
+  if (r.judgeConfidence != null && r.judgeConfidence < REASON_CONFIDENCE_THRESHOLD) return true;
+  return false;
+}
 const {
   Document, Packer, Paragraph, TextRun,
   AlignmentType, BorderStyle, HeadingLevel,
@@ -282,6 +316,12 @@ async function loginToSellerCenter(page) {
   }
 
   if (!(await isLoggedIn(page))) {
+    // 무인 환경(오전 8시 자동 실행)에서 askQuestion()으로 블로킹하면 영구 멈춤
+    // → 에러 throw로 즉시 종료, main().catch()가 Slack 알림 + 락파일 정리 담당
+    if (process.argv.includes('--scheduled')) {
+      throw new Error('세션 만료: 수동 재로그인 필요. 터미널에서 한 번 직접 실행해서 세션을 갱신해 주세요.');
+    }
+    // 수동 실행 시에는 기존처럼 대기
     log('  추가 인증이 필요합니다. 브라우저에서 인증 완료 후 Enter를 누르세요.');
     await askQuestion('  인증 완료 후 Enter ▶ ');
     await sleep(2000);
@@ -648,9 +688,7 @@ async function closeModal(page) {
 // - 환불은 당분간 사람이 수동 처리 (이 함수는 판단 + 근거 제공만)
 // ─────────────────────────────────────────────────────────
 async function judgeReview({ productName, rating, reviewText, reviewPosition }) {
-  const posStr = (reviewPosition && reviewPosition > 0)
-    ? `${reviewPosition}위`
-    : '미확인';
+  const posStr = formatReviewPosition(reviewPosition);
 
   const systemPrompt = `당신은 코에르(COEIR) 브랜드 운영 담당자입니다.
 네이버 스마트스토어 리뷰를 보고 "환불검토가 필요한 건인지" vs "답변으로 대처하고 넘어갈 수 있는 건인지" 종합 판단합니다.
@@ -664,12 +702,31 @@ async function judgeReview({ productName, rating, reviewText, reviewPosition }) 
    단, 별점 4~5이라도 리뷰 순위 1~10위 + 제품 사용 시 불편함·통증·기능 문제 언급 → 환불검토 (true)
    (별점이 높아도 상위 노출 리뷰에 부정 내용이 있으면 브랜드 이미지 타격이 크므로 적극 대응)
    ★ 특히 리뷰 순위 1~5위는 구매 전환에 직접 영향 → "귀찮다", "번거롭다", "두 개 샀는데 하나만 쓴다", "아쉽다" 같은 미묘한 부정 뉘앙스라도 환불검토 (true)로 보수적 판단
+   ★★ 리뷰 순위 1~20위 + **부정 내용이 전체 리뷰의 절반 이상**(부정으로 리뷰가 시작되거나, 부정 표현이 더 길게/구체적으로 묘사되거나, 별점 차감 사유로 명시된 경우) → 환불검토 (true)
+       (예: 욕실매트 11위 "비싼편이에요~ 길이도 43cm밖에 안되서 좁은 느낌" → 부정으로 시작 + 사이즈 불만 + 긍정 내용 없음 → 환불검토)
+   🚨 **가격 불만 단독은 환불검토 사유 아님** — 본문에 "잘 쓰고 있다 / 디자인 예쁘다 / 만족 / 좋아요" 같은 긍정 표현이 함께 있으면, 가격 비싸다·가격대 쎄다·비싼감 있다 표현이 있어도 → 답변 (false)
+       (예: "디자인 너무예쁘구요 사이즈 선택도 잘했어요. 가격대는 좀 쎄네요" → 디자인·사이즈 만족이 핵심, 가격은 부수적 의견 → 답변)
+       (예: "잘쓰고있어요. 비싼감이있지만" → 잘 쓰고 있다가 핵심 → 답변)
+       (예: "좀 비싼거 빼고 안미끌려 좋아요 디쟌 이쁘고" → 좋다·예쁘다가 핵심 → 답변)
 5. 별점 4~5 + 전반적 긍정·중립 → 답변으로 대처 (false)
 6. 별점 3 + 내용이 부정적·노출 영향 큼 → 환불검토 (true)
+   단, 별점 3이라도 **본문이 명백히 긍정**("배송 빠르다", "제품 좋다", "만족" 등 칭찬 위주)이고 **부정 내용 없음** → 답변으로 충분 (false)
+   (별점은 실수 가능성이 있으니 본문이 진짜 의도. 답변에서 가벼운 위트로 "5점 아니라 3점은 실수로 잘못 누르신거죠?^^;" 류 톤 사용 가능)
 7. 애매한 경우 confidence를 낮게 설정 (사람 검토 유도)
 8. [예외 - 답변으로 처리하면 충분한 케이스]
    - 스테인리스 욕실선반 "동봉된 스패너로 설치 시 긁힘 발생" → 환불 사유 아님. 스패너 사용법(제품과 닿지 않게 돌리기 / 마지막에 꽉 조이기 / 약간 긁혀도 가려져서 안 보임) 안내로 충분 → false
    - 단순 설치 미숙으로 인한 표면 흠집은 환불 사유가 아님 (제품 결함 아님) → false
+   - 별점 3점이라도 본문이 명백히 긍정·중립이면 환불 사유 없음 → false (위 원칙 6 단서)
+   - **디스펜서 "입구가 작다 / 좁다 / 세제 리필이 번거롭다"** → 환불 사유 아님. 디스펜서 입구는 표준 크기이며 깔때기 사용을 안내하면 충분 → false
+   - **테라조 비누받침대 "비누가 붙어서 떼야 한다 / 번거롭다"** → 제품 문제가 아니라 비누 특성(무른 비누 vs 솔리드한 비누) 차이. 솔리드한 비누 추천 안내로 충분 → false
+   - 위 두 케이스는 리뷰가 "너무 귀엽다 / 디자인 좋다" 같은 긍정 표현으로 시작하면 더더욱 환불 대상 아님 (긍정 톤이 우선)
+   - **배송 파손 / 박스 손상이 있었지만 "잘 쓰고 있다 / 사용에 문제 없다"** → 환불 사유 아님 (이미 해결된 케이스). 사과 + 포장·배송 시스템 개편 안내로 충분 → false
+       (예: "배송중 파손되서 몇번씩 반품했네요..잘 쓰고 있어요.." → 결국 잘 쓰고 있다 → false)
+   - **발리콘 욕실화 "딱딱하다 / 무겁다" + "미끄럼 방지는 좋다"** → 환불 사유 아님. 묵직한 무게감 = 미끄럼방지를 위한 의도된 설계 (제품 특징). 단단함은 EVA와 달리 안전·내구성을 위한 경도. 정정 안내로 충분 → false
+   - **본문 전체가 긍정/중립이며 가격 불만만 부수적**으로 언급된 모든 케이스 → 환불 사유 아님 (위 원칙 4 단서)
+   - **"사이즈가 더 컸으면 / 작았으면 좋겠다" 같은 단순 사이즈 아쉬움 단독** + 본문 긍정("깔끔합니다", "좋아요" 등) → 환불 사유 아님. "최적의 사이즈로 개발했다" 안내로 충분 → false
+   - **"수압이 한 가지" / "기능 다양성이 부족하다" 같은 비핵심 기능 아쉬움 단독** + 본문 긍정 → 환불 사유 아님. "제품팀에 전달하여 개발 검토하겠다" 정도의 약속 톤으로 대응 → false
+       (예: 샤워기 "수압이 쎄서 좋고 감 부드럽고 색상 예뻐요. 아쉬운점은 수압이 한가지" → 전체 긍정, 수압 다양성은 핵심 USP 아님 → false)
 
 [리뷰 순위의 의미]
 - 네이버 브랜드스토어 랭킹순 기준 순위
@@ -741,8 +798,13 @@ function getProductKnowledge(productName) {
 - 주의: TPE를 "젖병 젖꼭지 소재"로 언급 X → "의료용품에 사용되는 소재" 로만 언급
 - [촉감/경도 관련 답변] "발에 닿는 느낌이 좋다 / 부드럽다 / 푹신하다" 같은 촉감 리뷰에는:
   → "너무 부드러워 미끄러지지도, 너무 단단하여 발바닥이 아프지도 않은 **최적의 경도를 여러 번 테스트하여 개발**" 했다는 점을 강조 (기능성+촉감 양쪽을 잡은 설계)
-- [가격 방어 답변] "비싸다 / 가격이 부담된다" 리뷰에는:
-  → 고급 TPE 소재 + KC마크 + **항곰팡이 테스트 통과** 까지 함께 언급해 가격 방어 (이 3가지를 묶어서 답변)
+- [가격 방어 답변] "비싸다 / 가격이 부담된다 / 가격대 쎄다 / 비싼감" 리뷰에는:
+  → 환불 사유 아님. 만족 표현이 함께 있으면 감사 인사 먼저, 그 다음 부드러운 가격 방어
+  → 가격 방어 키워드: **"의료 용품에 사용되는 소재"** + KC마크 + 다양한 유해물질 테스트 통과 + **"원재료 값이 월등히 비싼 게 사실"** + "최근 전쟁으로 모든 비용이 증가했지만 **고객님 부담 가중을 막기 위해 기존 가격을 유지**" + "회사에 건의해보겠다" 톤
+  → 사이즈 다양성 불만이 함께 있으면 → "S(55×55) / M(45×75) / L(60×90) **3가지 사이즈를 공간에 맞게 조합 사용**할 수 있도록 제공" 안내
+- [건조 / 말리기 관련 답변] "고리에 걸어 말린다 / 벽에 붙여 말린다" 류 리뷰에는:
+  → "**고리나 선반에 걸쳐 말리는 게 벽에 붙여 말리는 것보다 훨씬 건조가 잘 됨**" 안내. 매트 양면이 공기 순환되어 빠른 건조 + 곰팡이·세균 억제에 유리
+  → 벽에 붙여 말린다는 리뷰에도 동일하게 "고리/선반이 더 잘 마른다"고 부드럽게 안내
 - [가벼움 답변] 욕실매트는 욕실화와 달리 '가벼움'이 장점 → "가볍다"는 리뷰엔 "가벼워서 설치와 세척이 훨씬 편리하다"고 긍정 답변 (욕실화는 절대 X)
 - [흡착판 관련 안내] 흡착판이 바닥에 붙는지 여부는 바닥 마감 재질에 따라 다름. 안전 기준:
   1) 건식 사용: 흡착 안 돼도 매트가 밀리지 않아 안전
@@ -762,7 +824,14 @@ function getProductKnowledge(productName) {
 - 세탁기 세탁 가능 (기존 딱딱한 규조토와 차별)
 - 기존 섬유 소재 빨아쓰는 규조토 대비 워셔블 레더는 때·오염이 덜 타고 제거도 쉬움
 - 주의: 'KC인증' 표현 X → 'KC마크가 있는 제품'
-- 주의: 고객이 빨아쓰는 규조토 발매트 개념을 모를 수 있으므로 설명이 필요할 수 있음`);
+- 주의: 고객이 빨아쓰는 규조토 발매트 개념을 모를 수 있으므로 설명이 필요할 수 있음
+- [말림 / 끝부분이 바닥에 안 붙는다는 리뷰]
+  → "워셔블 레더 소재 특성상 처음 사용 시 끝부분이 살짝 말리는 경우가 있으나, **시간이 지나면 자연스럽게 원상복귀**됩니다" 라고 안심시키는 안내 추가
+- ★ [흡수력·소재 설명 시 핵심 맥락]
+  → "워셔블 레더 재질은 **오염에 강한 가죽 재질이면서도 물기는 흡수가 되도록 개발된 제품**" 이라는 두 가지 특성(오염 강함 + 흡수 가능)을 함께 강조. 단순히 "흡수 잘 된다"만 말하지 말고 "가죽 재질이라 오염에는 강한데 흡수까지 되도록 개발했다"는 차별점 어필
+- [가격 비싸다 리뷰] → 가격 방어: "안미끌리고 디자인 예쁘다"는 만족 포인트 인정 + 워셔블 레더의 차별성·세탁 편의성으로 자연스럽게 가치 어필
+- [사이즈 아쉬움 리뷰 — "더 컸으면 좋겠다"] → 환불 사유 아님
+  → "더 크면 사용성이 생각보다 좋지 않아 **여러 차례 테스트를 거쳐 최적의 사이즈로 개발**" 했다는 톤으로 자연스럽게 안내. S(40×60) / M(50×70) 두 가지 옵션 제공 사실도 함께 언급 가능`);
   }
 
   // ── 발리콘 욕실화 ───────────────────────────────
@@ -776,7 +845,12 @@ function getProductKnowledge(productName) {
 - 주의: 굴패각 함유 PVC를 '친환경 소재' 로 표현 X
 - 주의: 굴패각과 항균을 인과관계로 연결 X (굴껍질 덕분에 항균효과가 있는 것이 아님)
 - 주의: "욕실문에 걸리지 않는 욕실화"라는 표현 X (문 사이즈에 따라 걸릴 수 있음)
-- 금지 표현: "욕실용으로 딱 맞게"`);
+- 금지 표현: "욕실용으로 딱 맞게"
+- ★ ["딱딱하다 / 무겁다" + "미끄럼 방지 좋다" 리뷰] — 환불 사유 아님 (제품 특징)
+  → 무게감은 **가벼워 미끄러운 욕실화와 달리 적당한 무게감으로 미끄럼방지에 최적화** 된 설계임을 강조
+  → 단단함은 **최적의 착화감을 위한 모양과 경도**로 제작되었음을 부드럽게 정정. "소재 자체가 딱딱할 수는 없는데, 고객님께는 조금 단단하게 느껴지셨나 보네요^^;" 류 톤
+  → 마무리: "단단하고 무게감이 있어 안전할 수 있다는 점 기억해주시면 좋을 것 같습니다!"
+  → 예시: "안녕하세요, 고객님! 코에르 발리콘 욕실화는 가벼워 미끄러운 욕실화와는 달리 적당한 무게감으로 미끄럼방지에 최적화되어 설계되었습니다! 동시에 최적의 착화감을 제공하기 위한 모양과 경도로 제작하였습니다. 소재 자체가 딱딱할 수는 없는데, 고객님께는 조금 단단하게 느껴지셨나 보네요^^; 단단하고 무게감이 있어 안전할 수 있다는 점 기억해주시면 좋을 것 같습니다! 리뷰 감사드리며 오늘도 좋은 하루 보내세요:)"`);
   }
 
   // ── 스테인리스 제품 공통 ────────────────────────
@@ -809,7 +883,11 @@ function getProductKnowledge(productName) {
     k.push(`[스테인리스 디스펜서] (27,000원)
 - 소재: SUS304 / 무광(브러쉬드 피니쉬) 마감
 - USP: SUS304 / 안티 핑거프린트 코팅 (AFC) / 브러쉬드 피니쉬 / 손쉬운 펌핑 / 세련된 미니멀 디자인
-- 핸드워시·주방세제 등 액상 제품용. 거품펌프로의 교환은 불가 (안내 시 주의)`);
+- 핸드워시·주방세제 등 액상 제품용. 거품펌프로의 교환은 불가 (안내 시 주의)
+- [입구가 작다 / 좁다 / 세제 리필 번거롭다 리뷰 — 환불 사유 아님]
+  → 디스펜서 입구는 **표준 디스펜서 크기**이며, 디스펜서 카테고리 자체가 입구를 작게 설계함 (재현성·내용물 보존을 위해)
+  → **깔때기 사용**을 자연스럽게 안내하면 충분. "저희도 입구를 조금 더 크게 만들 수 있는 방안이 있는지 고민해보겠다"는 메시지로 마무리
+  → 예시: "안녕하세요, 고객님. 😊 디스펜서 입구가 좁아 불편하셨군요! 그런데 저희 제품의 입구 크기는 표준 디스펜서 입구 크기 정도라 저희 제품이 딱히 작다기 보다 디스펜서라는 제품의 특성상 전반적으로 조금 작게 만들어지고 있는 것 같습니다^^; 그래서 보통 디스펜서에 세제 등을 넣으실 때는 깔때기를 많이 사용들 하십니다. 저희도 입구를 조금 더 크게 만들 수 있는 방안이 있는지 고민해보도록 하겠습니다! 리뷰 감사드리며 오늘도 좋은 하루 보내세요!"`);
   }
   if (name.includes('트레이') && !name.includes('테라조') && !name.includes('드라이')) {
     k.push(`[스테인리스 트레이] (22,000원)
@@ -825,6 +903,9 @@ function getProductKnowledge(productName) {
 - 공통 USP: 안티 핑거프린트 코팅 (AFC) / SUS304 / 배수라인 / 안전·깔끔 마감 / 실용적 사이즈 / 간편하지만 강력한 무타공
 - 무타공 접착식이지만 튼튼하게 고정 (셀프 설치 가능), 타공 옵션도 제공
 - 부속품: '무타공 스티커 세트' / '타공 나사 세트' (각 1,000원) 별도 판매
+- ★ [무타공 견고함 — 매우 중요] 베이직/히든/플랫 **모두** 무타공 스티커로 설치해도 굉장히 견고함. 물건 넣고 펌핑까지 강하게 해도 흔들림 없는 안정성. "물건 넣으려면 타공 필수"·"무타공이라 약하다" 류 리뷰는 사실과 다르므로 정정하며 적극 강조해야 함. 다만 벽면 상태에 따라 무타공 설치 불가한 벽이 있어, 그 경우만 상세페이지 하단의 안내를 참조하여 타공으로 설치하도록 안내
+- [예시 답변 톤 — 무타공 오해 정정]
+  "어머, 아니에요! 저희 욕실선반은 모두 무타공으로 설치해도 굉장히 견고하답니다! 물건들 넣고, 심지어 펌핑까지 강하게 해도 전혀 흔들림없는 안정성을 자랑해요^^ 다만 벽면의 상태에 따라 무타공으로 설치가 불가할 수 있는데(상세페이지 하단 안내 참조), 그럴 경우에만 타공으로 설치하셔서 사용하시면 됩니다!"
 - [설치 시 스패너 사용 안내] "동봉된 스패너 사용 시 긁힘이 생긴다"는 리뷰에는:
   → 환불 사유가 아니며, 다음 가이드를 부드럽게 안내하면 충분 (환불검토 불필요):
     1) 스패너를 제품과 직접 닿지 않게 돌리면 긁힘 없이 설치 가능
@@ -849,11 +930,19 @@ function getProductKnowledge(productName) {
 - 공통 USP: 내구성 좋고 관리 편한 레진 소재 / 물때·미끄럼 방지 논슬립 패드 / 100% 핸드메이드 프리미엄 퀄리티
 - 세트(비누받침+칫솔꽂이 / 디스펜서+멀티홀더+트레이 등) 사용 시 공간 통일감·인테리어 효과 극대화
 - 카피: "천연스톤을 하나하나 담아낸 100% 핸드메이드, 내구성과 감도를 모두 갖춘 코에르 테라조 라인"
-- 설명이 필요할 때만 "천연스톤과 레진을 조합하여 만든 저희 테라조 제품은" 표현 사용 (매 답변마다 X)`);
+- 설명이 필요할 때만 "천연스톤과 레진을 조합하여 만든 저희 테라조 제품은" 표현 사용 (매 답변마다 X)
+- ★ [배송 중 파손 / 박스 손상 리뷰 — 환불 사유 아님 (이미 해결된 케이스)]
+  → 본문에 "잘 쓰고 있다 / 사용에 문제없다" 가 있으면 → 사과 + **포장·배송 시스템 전면 개편** 안내로 충분
+  → 키 메시지: "본 제품이 무게가 무겁고 길다보니 파손 사례가 가끔 발생함" + "**내부 포장 방법을 전면 개편**" + "**배송 시스템을 전면 개편**" + "솔직한 피드백 감사" 톤
+  → 예시: "안녕하세요, 고객님. 파손으로 불편함을 끼쳐드려 정말 죄송합니다. 본 제품이 무게가 무겁고 길다보니 파손이 되는 사례가 가끔 발생합니다. 해당 부분을 개선하기 위해 내부 포장 방법을 전면 개편하여 지금은 파손이 되지 않도록 배송 시스템을 전면 개편하였습니다! 솔직한 피드백 감사드리며, 작은 부분까지 발전하는 코에르가 되도록 노력하겠습니다^^ 좋은 하루 보내세요:)"`);
     if (name.includes('비누받침')) {
       k.push(`- 테라조 비누받침대 베이직 (24,000원) / 웨이브 (27,000원) — 웨이브가 더 고급 디자인
 - 배수 홀로 물빠짐 원활, 비누 무름 방지. '묵직해서 움직이지 않는' 안정감
-- 베이직에서 "비누가 미끄러진다"는 리뷰에는 웨이브 모델을 언급할 수 있음`);
+- 베이직에서 "비누가 미끄러진다"는 리뷰에는 웨이브 모델을 언급할 수 있음
+- [비누가 받침대에 붙는다 / 떼어내야 한다 리뷰 — 환불 사유 아님]
+  → 제품 문제가 아니라 **비누의 특성** 차이. 무른 비누는 더 잘 달라붙고, 솔리드(단단)한 비누는 잘 안 붙음
+  → "다양한 비누로 테스트해본 결과 비누 성질에 따라 다르더라" + "솔리드한 비누 추천" 톤으로 안내
+  → 예시: "안녕하세요, 고객님. 😊 비누가 받침대에 붙어서 불편하셨군요! 제품을 개발하며 저희가 다양한 비누로 테스트를 진행했었는데, 비누가 받침대에 붙는 문제는 제품보다는 비누의 특성에 따라 달랐어요! 많이 무른 비누의 경우엔 제품에 상대적으로 더 잘 달라붙지만, 좀 더 솔리드한 비누의 경우엔 붙지 않고 편안하게 사용할 수 있었습니다. 현재 비누가 불편하시다면 조금 더 단단하고 솔리드한 비누로 바꾸어 사용해보시길 추천드립니다! 리뷰 감사드리며 오늘도 좋은 하루 보내세요!"`);
     }
     if (name.includes('칫솔')) {
       k.push(`- 테라조 칫솔꽂이 라운드 (28,000원) / 스퀘어 (38,000원) — 스퀘어가 상위 라인
@@ -899,7 +988,10 @@ function getProductKnowledge(productName) {
 - 편의: 수도꼭지까지 안 가고 손잡이 STOP 버튼으로 물 조절 → 물 절약, 고압 수압
 - 무광 화이트 컬러, 욕실 인테리어 매치 우수
 - 구성품: 샤워기 본체 + PLA 필터 기본 포함 (샤워호스·추가 PLA·ACF 헤드필터는 별도 구매)
-- ※ 답변 시 "미세플라스틱 미검출/검출되지 않음" 포인트를 반드시 우선 언급 (단순 필터 기능보다 PLA 소재 자체의 안전성이 진짜 차별점)`);
+- ※ 답변 시 "미세플라스틱 미검출/검출되지 않음" 포인트를 반드시 우선 언급 (단순 필터 기능보다 PLA 소재 자체의 안전성이 진짜 차별점)
+- ★ ["수압이 한 가지" / "수압 모드 다양했으면" 류 비핵심 기능 아쉬움 — 환불 사유 아님]
+  → 수압 다양성은 코에르 샤워기의 핵심 USP가 아님 (핵심은 미세플라스틱 미검출 + 듀얼 필터 + 온오프). 본문이 전체 긍정이면 답변으로 충분
+  → 톤: 만족 포인트(수압·감·색상 등) 공감 + "**수압을 다양하게 개발해볼 수 있도록 제품팀에 전달하겠다**" 약속 톤. 환불·교환 안내 X`);
   }
   if (name.includes('pla') && name.includes('필터') && !name.includes('샤워기')) {
     k.push(`[PLA 필터] (16,000원)
@@ -970,6 +1062,9 @@ ${productKnowledge ? `[이 제품 관련 지식]\n${productKnowledge}\n` : ''}
 - 욕실 미끄럼방지 매트의 가격 부담 리뷰에는 고급 TPE + KC마크 + **항곰팡이 테스트 통과** 3가지를 묶어 가격 방어
 - 욕실 매트의 촉감/푹신함 리뷰에는 "너무 부드러워 미끄러지지도, 너무 단단하여 발바닥이 아프지도 않은 최적의 경도를 여러 번 테스트하여 개발" 식으로 기능성+촉감 양립을 강조
 - 금지 표현: "욕실용으로 딱 맞게", "KC인증"(→'KC마크 획득 제품'), "친환경 PVC", "굴패각 덕분에 항균", "욕실문에 걸리지 않는", "양면 컬러"(→'리버시블 디자인')
+- 🚨 **고객센터 전화번호·연락처 임의 표기 절대 금지** (예: "1588-XXXX", "02-XXXX" 같은 번호를 만들지 말 것). 환불·교환·문의 안내가 필요하면 "**고객센터로 연락 주시거나**" 정도만 표현할 것
+- [욕실선반 무타공 견고함 강조] "타공이 필수다"·"무타공이라 약할 것 같다" 류 리뷰에는 → 욕실선반 베이직/히든/플랫 모두 무타공 스티커로 설치해도 굉장히 견고하며 펌핑 강하게 해도 흔들림 없음을 적극 강조. 다만 벽면 상태에 따라 무타공 설치 불가한 벽이 있으니 그 경우만 상세페이지 하단을 참조하여 타공으로 설치하라고 안내. 무타공 = 타공만큼 견고함을 반드시 어필
+- [3점 + 본문 명백 긍정 케이스] 별점 3점인데 본문이 칭찬 위주("배송 빠르다", "제품 좋다" 등)면 별점이 실수로 잘못 눌린 가능성 → 가벼운 위트 한 줄 가능 (예: "5점이 아니라 3점은 실수로 잘못 누르신거죠?^^;"). 단 너무 무례하지 않게, 부드럽고 친근한 톤으로
 - TPE 소재는 "의료용품에 사용되는 소재"로만 언급 ('젖병 젖꼭지 소재' X)
 - 테라조 제품 설명이 필요할 때만 "천연스톤과 레진을 조합하여" 표현 활용 (매번 X)
 - 세트 구매/인테리어 관련 리뷰는 세트 사용 시 공간이 통일감 있게 살아난다는 점 언급 가능
@@ -1010,6 +1105,94 @@ ${productKnowledge ? `[이 제품 관련 지식]\n${productKnowledge}\n` : ''}
 // ─────────────────────────────────────────────────────────
 // Slack DM 전송 (Slack Bot Token 필요)
 // ─────────────────────────────────────────────────────────
+// 오류 발생 시 Slack 단문 알림 (catch 핸들러용)
+async function sendSlackError(message) {
+  const token     = cfg.SLACK_BOT_TOKEN;
+  const channelId = cfg.SLACK_CHANNEL_ID || cfg.SLACK_USER_ID || 'U08KNE04HKK';
+  if (!token) return;
+  const body = JSON.stringify({ channel: channelId, text: `🚨 *코에르 리뷰 자동화 오류*\n${message}` });
+  return new Promise(resolve => {
+    const req = require('https').request(
+      { hostname: 'slack.com', path: '/api/chat.postMessage', method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json; charset=utf-8' } },
+      res => { res.resume(); resolve(); }
+    );
+    req.on('error', resolve);
+    req.write(body);
+    req.end();
+  });
+}
+
+// 워드 파일을 슬랙 채널에 업로드 (files.getUploadURLExternal flow)
+// 1) getUploadURLExternal 로 임시 업로드 URL 받음
+// 2) URL 에 파일 바이너리 POST
+// 3) completeUploadExternal 로 채널에 게시
+async function uploadFileToSlack(filepath, channelId, comment = '') {
+  const token = cfg.SLACK_BOT_TOKEN;
+  if (!token) { log('[슬랙 파일] 토큰 없음 — 스킵'); return; }
+  if (!channelId) { log('[슬랙 파일] 채널 ID 없음 — 스킵'); return; }
+  if (!fs.existsSync(filepath)) { log(`[슬랙 파일] 파일 없음: ${filepath}`); return; }
+
+  const filename = path.basename(filepath);
+  const fileBuf  = fs.readFileSync(filepath);
+  const length   = fileBuf.length;
+
+  const httpsReq = (opts, body) => new Promise((resolve, reject) => {
+    const req = require('https').request(opts, res => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => resolve({ status: res.statusCode, body: data }));
+    });
+    req.on('error', reject);
+    if (body) req.write(body);
+    req.end();
+  });
+
+  try {
+    // 1) 업로드 URL 발급
+    const step1Body = `filename=${encodeURIComponent(filename)}&length=${length}`;
+    const step1 = await httpsReq({
+      hostname: 'slack.com', path: '/api/files.getUploadURLExternal', method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(step1Body),
+      },
+    }, step1Body);
+    const step1Json = JSON.parse(step1.body);
+    if (!step1Json.ok) { log(`[슬랙 파일] URL 발급 실패: ${step1Json.error}`); return; }
+    const { upload_url, file_id } = step1Json;
+
+    // 2) 발급된 URL 에 바이너리 POST
+    const url = new URL(upload_url);
+    const step2 = await httpsReq({
+      hostname: url.hostname, path: url.pathname + url.search, method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream', 'Content-Length': length },
+    }, fileBuf);
+    if (step2.status >= 400) { log(`[슬랙 파일] 업로드 HTTP ${step2.status}`); return; }
+
+    // 3) completeUploadExternal 로 채널 게시
+    const step3Body = JSON.stringify({
+      files: [{ id: file_id, title: filename }],
+      channel_id: channelId,
+      initial_comment: comment || '',
+    });
+    const step3 = await httpsReq({
+      hostname: 'slack.com', path: '/api/files.completeUploadExternal', method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Length': Buffer.byteLength(step3Body),
+      },
+    }, step3Body);
+    const step3Json = JSON.parse(step3.body);
+    if (step3Json.ok) log(`[슬랙 파일] 업로드 완료: ${filename}`);
+    else               log(`[슬랙 파일] 게시 실패: ${step3Json.error}`);
+  } catch (e) {
+    log(`[슬랙 파일] 오류: ${e.message}`);
+  }
+}
+
 async function sendSlackDM(summary) {
   const token     = cfg.SLACK_BOT_TOKEN;
   const channelId = cfg.SLACK_CHANNEL_ID || cfg.SLACK_USER_ID || 'U08KNE04HKK'; // 채널 우선, 없으면 DM
@@ -1043,22 +1226,23 @@ async function sendSlackDM(summary) {
   ];
 
   // ── 답변 완료 리뷰 목록 ───────────────────────────
-  const repliedList = summary.results.filter(r => r.replyText);
+  const repliedList = sortByRank(summary.results.filter(r => r.replyText));
   if (repliedList.length > 0) {
     repliedList.forEach((r, i) => {
       lines.push(`─────────────────────────────`);
       lines.push(`No.${i + 1}`);
       lines.push(`리뷰글번호 : ${r.reviewNo || '-'}`);
       lines.push(`등록자 : ${r.writer}`);
-      lines.push(`제품명 : ${r.productName}`);
-      if (r.optionName) lines.push(`구매 옵션 : ${r.optionName}`);
-      lines.push(`리뷰 : "${r.reviewText.replace(/\n/g, ' ')}"`);
+      lines.push(`제품명 : ${getMasterProductName(r.productName)}`);
+      { const opt = resolveDisplayOption(r); if (opt) lines.push(`구매 옵션 : ${opt}`); }
       lines.push(`별점 : ${stars(r.rating)} (${r.rating}점)`);
-      lines.push(`리뷰순위 : ${r.reviewPosition > 0 ? `${r.reviewPosition}위` : '미확인'}`);
+      lines.push(`리뷰순위 : ${formatReviewPosition(r.reviewPosition)}`);
+      lines.push(`리뷰 : "${r.reviewText.replace(/\n/g, ' ')}"`);
       if (r.judgeLabel) {
         lines.push(`*🏷️ 판단 : ${r.judgeLabel}*`);
       }
-      if (r.judgeReason) {
+      // 판단 근거: 환불검토 + 답변이라도 confidence 낮으면(< 90) 표시
+      if (shouldShowJudgeReason(r)) {
         lines.push(`*🔴 판단 근거 : ${r.judgeReason}${r.judgeConfidence != null ? ` (confidence ${r.judgeConfidence})` : ''}*`);
       }
       lines.push(`답변 : "${r.replyText}"`);
@@ -1067,18 +1251,19 @@ async function sendSlackDM(summary) {
   }
 
   // ── 환불검토 항목 ─────────────────────────────────
-  const refundList = summary.results.filter(r => r.refundCheck === '검토필요');
+  const refundList = sortByRank(summary.results.filter(r => r.refundCheck === '검토필요'));
   if (refundList.length > 0) {
     lines.push(`─────────────────────────────`);
     lines.push(`⚠️ 환불검토 필요 항목 (${refundList.length}건)`);
     refundList.forEach((r, i) => {
       lines.push(`No.${i + 1}  ${stars(r.rating)} (${r.rating}점)  |  ${r.writer}`);
       lines.push(`리뷰글번호 : ${r.reviewNo || '-'}`);
-      lines.push(`제품명 : ${r.productName}`);
-      if (r.optionName) lines.push(`구매 옵션 : ${r.optionName}`);
-      lines.push(`리뷰 : "${r.reviewText.replace(/\n/g, ' ')}"`);
-      lines.push(`리뷰순위 : ${r.reviewPosition > 0 ? `${r.reviewPosition}위` : '미확인'}`);
+      lines.push(`제품명 : ${getMasterProductName(r.productName)}`);
+      { const opt = resolveDisplayOption(r); if (opt) lines.push(`구매 옵션 : ${opt}`); }
+      lines.push(`별점 : ${stars(r.rating)} (${r.rating}점)`);
+      lines.push(`리뷰순위 : ${formatReviewPosition(r.reviewPosition)}`);
       lines.push(`📋 대응 정책 : ${r.refundPolicy || '미확인'}`);
+      lines.push(`리뷰 : "${r.reviewText.replace(/\n/g, ' ')}"`);
       if (r.judgeLabel) {
         lines.push(`*🏷️ 판단 : ${r.judgeLabel}*`);
       }
@@ -1096,7 +1281,7 @@ async function sendSlackDM(summary) {
     lines.push(`❌ 답변 실패 항목 (${failList.length}건)`);
     failList.forEach((r, i) => {
       lines.push(`No.${i + 1}  ${stars(r.rating)} (${r.rating}점)  |  ${r.writer}`);
-      lines.push(`제품명 : ${r.productName}`);
+      lines.push(`제품명 : ${getMasterProductName(r.productName)}`);
       lines.push(`리뷰 : "${r.reviewText.replace(/\n/g, ' ')}"`);
       lines.push(``);
     });
@@ -1143,6 +1328,13 @@ async function sendSlackDM(summary) {
 // ─────────────────────────────────────────────────────────
 async function generateWordDoc(summary) {
   const stars     = n => '⭐'.repeat(Math.max(0, Math.min(5, n || 0)));
+  // Word용 별모양 TextRun 배열 — 점수만큼만 금색 ★ 표시 (빈별 없음)
+  // bold: 제목줄(No.~)에서 사용, size: 기본 22 (label 기본값과 동일)
+  const starRuns = (n, { bold = false, size = 22 } = {}) => {
+    const filled = Math.max(0, Math.min(5, n || 0));
+    if (filled === 0) return [];
+    return [new TextRun({ text: '★'.repeat(filled), bold, size, font: 'Malgun Gothic', color: 'F5A623' })];
+  };
   const dateStr   = summary.date.replace(/\s/g, '').replace(/\.$/, '')
     .split('.').map((p, i) => i === 0 ? p : p.padStart(2, '0')).join('.');
 
@@ -1200,7 +1392,7 @@ async function generateWordDoc(summary) {
       children: [label('■ 답변 완료 항목', true, 24)],
     }),
 
-    ...summary.results.filter(r => r.replyText).flatMap((r, i) => [
+    ...sortByRank(summary.results.filter(r => r.replyText)).flatMap((r, i) => [
       // 번호 행
       new Paragraph({
         spacing: { before: 200, after: 80 },
@@ -1209,21 +1401,21 @@ async function generateWordDoc(summary) {
       }),
       new Paragraph({ spacing: { after: 60 }, children: [label('리뷰글번호 : ', true), label(r.reviewNo || '-')] }),
       new Paragraph({ spacing: { after: 60 }, children: [label('등록자 : ', true), label(r.writer)] }),
-      new Paragraph({ spacing: { after: 60 }, children: [label('제품명 : ', true), label(r.productName)] }),
-      ...(r.optionName ? [new Paragraph({ spacing: { after: 60 }, children: [label('구매 옵션 : ', true), label(r.optionName)] })] : []),
+      new Paragraph({ spacing: { after: 60 }, children: [label('제품명 : ', true), label(getMasterProductName(r.productName))] }),
+      ...((opt => opt ? [new Paragraph({ spacing: { after: 60 }, children: [label('구매 옵션 : ', true), label(opt)] })] : [])(resolveDisplayOption(r))),
+      new Paragraph({ spacing: { after: 60 }, children: [label('별점 : ', true), ...starRuns(r.rating), label(` (${r.rating}점)`)] }),
+      new Paragraph({
+        spacing: { after: 60 },
+        children: [
+          label('리뷰순위 : ', true),
+          new TextRun({ text: formatReviewPosition(r.reviewPosition), font: 'Malgun Gothic', size: 22, bold: true, color: r.reviewPosition === -2 ? '888888' : '1F3864' }),
+        ],
+      }),
       new Paragraph({
         spacing: { after: 60 },
         children: [
           label('리뷰 : ', true),
           new TextRun({ text: `"${r.reviewText.replace(/\n/g, ' ')}"`, font: 'Malgun Gothic', size: 22, italics: true }),
-        ],
-      }),
-      new Paragraph({ spacing: { after: 60 }, children: [label('별점 : ', true), label(`${stars(r.rating)} (${r.rating}점)`)] }),
-      new Paragraph({
-        spacing: { after: 60 },
-        children: [
-          label('리뷰순위 : ', true),
-          new TextRun({ text: r.reviewPosition > 0 ? `${r.reviewPosition}위` : '미확인', font: 'Malgun Gothic', size: 22, bold: true, color: '1F3864' }),
         ],
       }),
       ...(r.judgeLabel ? [new Paragraph({
@@ -1233,7 +1425,8 @@ async function generateWordDoc(summary) {
           new TextRun({ text: r.judgeLabel, bold: true, size: 22, font: 'Malgun Gothic', color: r.judgeLabel === '환불검토' ? 'C00000' : '2E7D32' }),
         ],
       })] : []),
-      ...(r.judgeReason ? [new Paragraph({
+      // 판단 근거: 환불검토 + 답변이라도 confidence 낮으면(< 90) 표시
+      ...(shouldShowJudgeReason(r) ? [new Paragraph({
         spacing: { after: 60 },
         children: [
           new TextRun({ text: '💭 판단 근거 : ', bold: true, size: 22, font: 'Malgun Gothic', color: 'C00000' }),
@@ -1258,7 +1451,7 @@ async function generateWordDoc(summary) {
 
     // ── 환불검토 항목 ─────────────────────────────────────
     ...(() => {
-      const list = summary.results.filter(r => r.refundCheck === '검토필요');
+      const list = sortByRank(summary.results.filter(r => r.refundCheck === '검토필요'));
       if (!list.length) return [];
       return [
         new Paragraph({
@@ -1269,18 +1462,12 @@ async function generateWordDoc(summary) {
           new Paragraph({
             spacing: { before: 160, after: 80 },
             shading: { fill: 'FFF2CC', type: ShadingType.CLEAR },
-            children: [label(`No.${i + 1}   ${stars(r.rating)} (${r.rating}점)   |   ${r.writer}`, true)],
+            children: [label(`No.${i + 1}   `, true), ...starRuns(r.rating, { bold: true }), label(` (${r.rating}점)   |   ${r.writer}`, true)],
           }),
           new Paragraph({ spacing: { after: 60 }, children: [label('리뷰글번호 : ', true), label(r.reviewNo || '-')] }),
-          new Paragraph({ spacing: { after: 60 }, children: [label('제품명 : ', true), label(r.productName)] }),
-          ...(r.optionName ? [new Paragraph({ spacing: { after: 60 }, children: [label('구매 옵션 : ', true), label(r.optionName)] })] : []),
-          new Paragraph({
-            spacing: { after: 60 },
-            children: [
-              label('리뷰 : ', true),
-              new TextRun({ text: `"${r.reviewText.replace(/\n/g, ' ')}"`, font: 'Malgun Gothic', size: 22, italics: true }),
-            ],
-          }),
+          new Paragraph({ spacing: { after: 60 }, children: [label('제품명 : ', true), label(getMasterProductName(r.productName))] }),
+          ...((opt => opt ? [new Paragraph({ spacing: { after: 60 }, children: [label('구매 옵션 : ', true), label(opt)] })] : [])(resolveDisplayOption(r))),
+          new Paragraph({ spacing: { after: 60 }, children: [label('별점 : ', true), ...starRuns(r.rating), label(` (${r.rating}점)`)] }),
           // 순위 / 정책 (환불검토 대상에만, 제품명 바로 다음)
           ...(r.reviewPosition > 0 ? [
             new Paragraph({
@@ -1300,13 +1487,20 @@ async function generateWordDoc(summary) {
           ] : [
             new Paragraph({
               spacing: { after: 60 },
-              children: [label('리뷰순위 : ', true), new TextRun({ text: '미확인', font: 'Malgun Gothic', size: 22 })],
+              children: [label('리뷰순위 : ', true), new TextRun({ text: formatReviewPosition(r.reviewPosition), font: 'Malgun Gothic', size: 22, color: r.reviewPosition === -2 ? '888888' : '000000' })],
             }),
             ...(r.refundPolicy ? [new Paragraph({
               spacing: { after: 60 },
               children: [label('📋 대응 정책 : ', true), label(r.refundPolicy)],
             })] : []),
           ]),
+          new Paragraph({
+            spacing: { after: 60 },
+            children: [
+              label('리뷰 : ', true),
+              new TextRun({ text: `"${r.reviewText.replace(/\n/g, ' ')}"`, font: 'Malgun Gothic', size: 22, italics: true }),
+            ],
+          }),
           ...(r.judgeLabel ? [new Paragraph({
             spacing: { after: 60 },
             children: [
@@ -1344,9 +1538,9 @@ async function generateWordDoc(summary) {
           new Paragraph({
             spacing: { before: 160, after: 80 },
             shading: { fill: 'FCE4D6', type: ShadingType.CLEAR },
-            children: [label(`No.${i + 1}   ${stars(r.rating)} (${r.rating}점)   |   ${r.writer}`, true)],
+            children: [label(`No.${i + 1}   `, true), ...starRuns(r.rating, { bold: true }), label(` (${r.rating}점)   |   ${r.writer}`, true)],
           }),
-          new Paragraph({ spacing: { after: 60 }, children: [label('제품명 : ', true), label(r.productName)] }),
+          new Paragraph({ spacing: { after: 60 }, children: [label('제품명 : ', true), label(getMasterProductName(r.productName))] }),
           new Paragraph({
             spacing: { after: 160 },
             children: [
@@ -1391,14 +1585,39 @@ async function generateWordDoc(summary) {
 
 async function collectVisibleRows(page) {
   // product_naver_ids.json 의 제품명 목록을 브라우저 컨텍스트로 전달
-  const knownProductNames = (() => {
-    try {
-      const ids = getProductNaverIds();
-      return Object.values(ids).map(v => v && v.name).filter(Boolean);
-    } catch { return []; }
-  })();
-  return page.evaluate((knownNames) => {
+  let knownProductNames = [];
+  let knownProductIds   = [];
+  try {
+    const ids = getProductNaverIds();
+    knownProductNames = Object.values(ids).map(v => v && v.name).filter(Boolean);
+    knownProductIds   = Object.keys(ids); // urlId 들 — reviewNo 와 충돌 방지용
+  } catch {}
+  return page.evaluate((knownNames, knownIds) => {
     window.__COEIR_PRODUCT_NAMES__ = knownNames || [];
+    window.__COEIR_PRODUCT_IDS__   = knownIds || [];
+
+    // ── 첫 3행의 col-id + 셀 내용 진단 로그 (옵션 누락 추적용) ──
+    // 헤더의 한국어 컬럼명도 함께 출력 → 옵션 컬럼 col-id 즉시 식별 가능
+    if (!window.__COEIR_COLID_LOGGED__) {
+      // 헤더 col-id → 한국어 라벨 매핑
+      const headerMap = {};
+      document.querySelectorAll('.ag-header-cell').forEach(h => {
+        const colId = h.getAttribute('col-id') || '';
+        const text = (h.innerText || h.textContent || '').trim().split('\n')[0];
+        if (colId) headerMap[colId] = text;
+      });
+      console.log('[헤더 col-id ↔ 라벨]', JSON.stringify(headerMap));
+      const debugRows = Array.from(document.querySelectorAll('.ag-center-cols-container .ag-row')).slice(0, 3);
+      debugRows.forEach((row, idx) => {
+        const dump = {};
+        row.querySelectorAll('.ag-cell').forEach(c => {
+          const k = c.getAttribute('col-id') || '?';
+          dump[k] = (c.innerText || '').slice(0, 60);
+        });
+        console.log(`[row#${idx} col-id 덤프]`, JSON.stringify(dump));
+      });
+      window.__COEIR_COLID_LOGGED__ = true;
+    }
     const pinnedRows  = Array.from(document.querySelectorAll('.ag-pinned-left-cols-container .ag-row'));
     const centerRows  = Array.from(document.querySelectorAll('.ag-center-cols-container .ag-row'));
 
@@ -1427,8 +1646,25 @@ async function collectVisibleRows(page) {
         if (colId) cellByColId[colId] = (c.innerText || c.textContent || '').trim();
       });
 
-      const channelNo   = texts.find(t => /^\d{10}$/.test(t)) || '';
-      const reviewNo    = texts.find(t => /^\d{8,12}$/.test(t) && t !== channelNo) || channelNo;
+      // ── col-id 키 목록 (아래에서 공용으로 사용) ──
+      const colKeys = Object.keys(cellByColId);
+
+      // ── 리뷰글번호 / 채널번호 (productNaverId 충돌 방지) ──
+      // col-id 우선 시도: 'reviewNo', 'reviewSeq', 'review_id' 류
+      const reviewColKey = colKeys.find(k => /^review.*(no|id|seq)$/i.test(k) || /reviewNo|reviewId|reviewSeq/.test(k));
+      const channelColKey = colKeys.find(k => /channel.*(no|id|product)|productNo|productId/i.test(k));
+      const knownPidSet = (typeof window.__COEIR_PRODUCT_IDS__ !== 'undefined') ? new Set(window.__COEIR_PRODUCT_IDS__) : new Set();
+      const allNumeric = texts.filter(t => /^\d{8,12}$/.test(t));
+      // 알려진 productNaverId 는 제외
+      const numericNonPid = allNumeric.filter(n => !knownPidSet.has(n));
+      // 10자리(=실제 reviewNo) 우선, 없으면 첫 비-PID 숫자
+      const tenDigit = numericNonPid.find(n => n.length === 10);
+      const reviewNo = (reviewColKey && cellByColId[reviewColKey])
+        ? cellByColId[reviewColKey]
+        : (tenDigit || numericNonPid[0] || '');
+      const channelNo = (channelColKey && cellByColId[channelColKey])
+        ? cellByColId[channelColKey]
+        : (allNumeric.find(n => knownPidSet.has(n)) || '');
       const writer      = texts.find(t => t.includes('*') && t.length >= 3) || '';
       const date        = texts.find(t => /\d{4}\.\d{2}\.\d{2}/.test(t)) || '';
       const ratingStr   = texts.find(t => /^[1-5]$/.test(t)) || '';
@@ -1438,9 +1674,18 @@ async function collectVisibleRows(page) {
       // 1) col-id로 시도: 'productName'/'option' 또는 유사 패턴
       let productName = '';
       let optionName  = '';
-      const colKeys = Object.keys(cellByColId);
-      const optionColKey = colKeys.find(k => /option|optn|opt/i.test(k));
-      const productColKey = colKeys.find(k => /product.*name|productname|productNm|prdNm|prdNm/i.test(k));
+      // 헤더 한글 라벨 기반 col-id 찾기 (셀러센터 컬럼명: "옵션", "구매옵션", "상품명", "주문상품명" 등)
+      const headerLabels = {};
+      document.querySelectorAll('.ag-header-cell').forEach(h => {
+        const cid = h.getAttribute('col-id') || '';
+        const txt = (h.innerText || h.textContent || '').trim().split('\n')[0];
+        if (cid && txt) headerLabels[cid] = txt;
+      });
+      const optionByLabel  = Object.keys(headerLabels).find(k => /옵션/.test(headerLabels[k]));
+      const productByLabel = Object.keys(headerLabels).find(k => /상품명|제품명|주문상품/.test(headerLabels[k]));
+      // 옵션 col-id 후보 확장: optionName, prdOption, productOption, optnNm, opt + 한글 라벨 매칭
+      const optionColKey  = optionByLabel  || colKeys.find(k => /option|optn(?!o)|prdOpt|productOpt|^opt$/i.test(k));
+      const productColKey = productByLabel || colKeys.find(k => /product.*name|productname|productNm|prdNm|goodsName|goodsNm/i.test(k));
       if (productColKey) {
         const raw = cellByColId[productColKey];
         // 같은 셀에 제품명 + 옵션이 줄바꿈/슬래시로 합쳐진 경우 분리
@@ -1471,15 +1716,16 @@ async function collectVisibleRows(page) {
         productName = chosen || '';
       }
 
-      // 옵션 정리: 제품명과 동일하면 제거, 너무 긴(50자+) 텍스트는 옵션 아님
-      if (optionName && (optionName === productName || optionName.length > 80)) optionName = '';
-      // 옵션 텍스트가 productName 을 포함하면 그 부분 제거
-      if (optionName && productName && optionName.includes(productName)) {
-        optionName = optionName.replace(productName, '').replace(/^[\s\/·\-]+|[\s\/·\-]+$/g, '');
+      // 3) 그래도 옵션 못 찾으면 휴리스틱: productName 셀 안 짧은 두 번째 줄
+      if (!optionName && productColKey) {
+        const raw = cellByColId[productColKey] || '';
+        // "제품명\n옵션" 또는 "제품명 / 옵션" 또는 "제품명: 옵션" 패턴
+        const split = raw.split(/\n+|\s\/\s|\s:\s|\s-\s/).map(s => s.trim()).filter(Boolean);
+        if (split.length > 1) optionName = split.slice(1).join(' / ');
       }
-
       // reviewText: 제품명·날짜·숫자·작성자·UI레이블이 아닌 첫 번째 텍스트
       // '코에르' 포함이라도 productName과 다르면 리뷰 내용일 수 있음 (예: "코에르 제품 좋아요")
+      // (아래 옵션 휴리스틱(4)에서도 참조하므로 미리 계산)
       const SKIP_LABELS = ['일반','프리미엄','포토','한달사용','베스트','답글있음','답변완료','답변있음'];
       const reviewText  = texts.find(t =>
         t.length > 3 &&
@@ -1489,6 +1735,23 @@ async function collectVisibleRows(page) {
         !/\d{4}\.\d{2}\.\d{2}/.test(t) && // 날짜 제외
         !SKIP_LABELS.includes(t)           // UI 레이블 제외
       ) || '';
+
+      // 4) 마지막 휴리스틱: 색상/사이즈 키워드 포함된 짧은 셀
+      if (!optionName) {
+        const optCandidate = texts.find(t =>
+          t.length > 1 && t.length <= 40 &&
+          t !== productName && t !== reviewText &&
+          /(?:색상|사이즈|컬러|타입|종류|개입|호선|S$|M$|L$|XL$|소형|중형|대형)/i.test(t)
+        );
+        if (optCandidate) optionName = optCandidate;
+      }
+
+      // 옵션 정리: 제품명과 동일하면 제거, 너무 긴(50자+) 텍스트는 옵션 아님
+      if (optionName && (optionName === productName || optionName.length > 80)) optionName = '';
+      // 옵션 텍스트가 productName 을 포함하면 그 부분 제거
+      if (optionName && productName && optionName.includes(productName)) {
+        optionName = optionName.replace(productName, '').replace(/^[\s\/·\-]+|[\s\/·\-]+$/g, '');
+      }
 
       // 최종수정일이 존재하면 답변 있음 (날짜가 2개 이상: 등록일 + 최종수정일)
       const allDates = texts.filter(t => /\d{4}\.\d{2}\.\d{2}/.test(t));
@@ -1501,7 +1764,7 @@ async function collectVisibleRows(page) {
         checkboxDisabled,  // ← 환불완료 등으로 비활성화된 행
       };
     }).filter(r => r.date || r.reviewNo);
-  }, knownProductNames);
+  }, knownProductNames, knownProductIds);
 }
 
 // ─────────────────────────────────────────────────────────
@@ -1640,8 +1903,11 @@ function findProductNaverId(productName) {
     if (info.name === pName) return { urlId, ...info };
   }
 
-  // 키워드 점수 매칭 (길이 2 이상 단어 기준)
+  // 키워드 점수 매칭 (길이 2 이상 단어 기준) + 디스크리미네이터 가중치
   const keywords = pName.split(/[\s[\]()·]+/).filter(w => w.length >= 2);
+  // 같은 라인에서 변형을 구분하는 결정 키워드 — 일치하면 가중치 +5
+  const DISCRIMINATORS = ['베이직', '히든', '플랫', '스퀘어', '라운드', '웨이브', '듀얼', '올인원', '스타터', 'PLA', 'ACF', 'TypeC', '1P', '4P', '8P'];
+  const pDisc = DISCRIMINATORS.filter(d => pName.includes(d));
   let bestMatch = null;
   let bestScore = 0;
 
@@ -1650,6 +1916,11 @@ function findProductNaverId(productName) {
     let score = 0;
     for (const kw of keywords) {
       if (iName.includes(kw)) score++;
+    }
+    // 디스크리미네이터: pName 에 포함된 단어가 후보 이름에도 있으면 +5, 없으면 -3
+    for (const d of pDisc) {
+      if (iName.includes(d)) score += 5;
+      else                   score -= 3;
     }
     if (score > bestScore) { bestScore = score; bestMatch = { urlId, ...info }; }
   }
@@ -1662,15 +1933,22 @@ function findProductNaverId(productName) {
 // 환불검토 대상 리뷰가 판매 페이지 몇 번째인지 조회
 // ─────────────────────────────────────────────────────────
 
-// 이모지·제어문자 제거 후 공백 정규화
+// 이모지·제어문자 제거 후 공백 정규화 + 말줄임표/반복 구두점 통일
 function normalizeReviewText(text) {
   return (text || '')
     .replace(/[\u{1F000}-\u{1FFFF}\u{2300}-\u{27FF}\u{FE00}-\u{FEFF}\u{1FA00}-\u{1FAFF}]/gu, '')
+    .replace(/[…⋯⋮]/g, '.')   // 유니코드 말줄임표 → 점
+    .replace(/\.{2,}/g, '.')    // 점 2개 이상 → 점 1개
     .replace(/\s+/g, ' ')
     .trim();
 }
 
-async function findReviewPosition(browser, productName, reviewText) {
+// 한글(가-힣)만 추출 — 말줄임표/구두점/이모지 차이를 완전히 무시한 비교용
+function koreanOnlyKey(text) {
+  return (text || '').replace(/[^가-힣]/g, '');
+}
+
+async function findReviewPosition(browser, productName, reviewText, writer) {
   if (!reviewText || !reviewText.trim()) {
     log(`  [순위 조회] reviewText 없음 → 순위 조회 불가`);
     return { position: -1, policy: null, productUrl: null };
@@ -1748,7 +2026,8 @@ async function findReviewPosition(browser, productName, reviewText) {
   const { originProductNo, checkoutMerchantNo } = productInfo;
 
   log(`  [순위 조회] brand.naver.com 검색 시작...`);
-  log(`    originProductNo: ${originProductNo}`);
+  log(`    매핑 제품: urlId=${productInfo.urlId} / originProductNo=${originProductNo} / 이름="${(productInfo.name || '').slice(0, 35)}"`);
+  if (writer) log(`    찾는 작성자: ${writer}`);
 
   // 이모지 제거 후 앞 30자로 매칭 스니펫 준비
   const matchSnippet = normalizeReviewText(reviewText).substring(0, 30);
@@ -1765,9 +2044,11 @@ async function findReviewPosition(browser, productName, reviewText) {
     await reviewPage.goto(productUrl + '#REVIEW', { waitUntil: 'networkidle2', timeout: 30000 });
     await sleep(2000);
 
-    const API_URL   = 'https://brand.naver.com/n/v1/contents/reviews/query-pages';
-    const PAGE_SIZE = 20;
-    const MAX_PAGES = 100;
+    const API_URL    = 'https://brand.naver.com/n/v1/contents/reviews/query-pages';
+    const PAGE_SIZE  = 20;
+    const TOP_LIMIT  = 100;                     // 100위까지만 조회
+    const MAX_PAGES  = Math.ceil(TOP_LIMIT / PAGE_SIZE); // = 5
+    const matchKor   = koreanOnlyKey(matchSnippet);
 
     let globalPos  = 0;
     let foundPos   = -1;
@@ -1817,20 +2098,38 @@ async function findReviewPosition(browser, productName, reviewText) {
 
       for (const rv of reviews) {
         globalPos++;
+        if (globalPos > TOP_LIMIT) break; // 100위 컷오프
         const rawText = rv.reviewContent || rv.reviewBody || rv.body || rv.content
                      || rv.reviewText || rv.text || rv.message || '';
         const normText = normalizeReviewText(rawText);
+        const normKor  = koreanOnlyKey(normText);
         lastSeenText = normText;
 
-        // 30자 매칭 → 실패 시 15자 fallback
-        const matched =
+        // 작성자 매칭 (마스킹 ID 동등 비교) — false positive 차단의 1차 게이트
+        const apiWriter = (rv.writerMemberId || rv.writerId || rv.maskedWriterId
+                        || rv.memberMaskingId || rv.writer || '').toString();
+        const writerMatched = writer && apiWriter && (
+          apiWriter === writer ||
+          apiWriter.replace(/\*/g, '') === writer.replace(/\*/g, '')
+        );
+
+        // 본문 매칭: 30자 → 15자 → 한글 시작 일치 fallback
+        const textMatched =
           normText.includes(matchSnippet) ||
           matchSnippet.includes(normText.substring(0, 15)) ||
-          normText.includes(matchSnippet.substring(0, 15));
+          normText.includes(matchSnippet.substring(0, 15)) ||
+          (matchKor.length >= 4 && normKor.length >= 4 && (
+            normKor.startsWith(matchKor) ||
+            matchKor.startsWith(normKor.substring(0, Math.min(matchKor.length, normKor.length)))
+          ));
+
+        // 짧은 리뷰(한글 7자 미만)는 본문만으로 신뢰 어려움 → 작성자도 일치해야 매칭
+        // 긴 리뷰는 본문 일치만으로도 매칭 OK (작성자 정보 없는 케이스 호환)
+        const matched = textMatched && (matchKor.length >= 7 || writerMatched || !writer);
 
         if (matched) { foundPos = globalPos; break; }
       }
-      if (foundPos > 0) break;
+      if (foundPos > 0 || globalPos >= TOP_LIMIT) break;
 
       // 마지막 페이지 확인
       const total = result.totalCount || result.totalElements || result.total || result.count || result.totalReviews || 0;
@@ -1839,12 +2138,21 @@ async function findReviewPosition(browser, productName, reviewText) {
       await sleep(300);
     }
 
-    if (foundPos <= 0 && lastSeenText) {
-      log(`  [순위 조회 디버그] 매칭 실패. 찾던 스니펫: "${matchSnippet}"`);
+    // 매칭 실패 처리:
+    //   globalPos === 0 → 진짜 미확인 (API 오류/리뷰 0개) — position = -1
+    //   globalPos > 0  → 어쨌든 상위 100개(또는 전체) 안에서 미발견 = 100위 밖 — position = -2
+    if (foundPos <= 0) {
+      foundPos = (globalPos > 0) ? -2 : -1;
+    }
+    const outOfTop100 = (foundPos === -2);
+
+    if (foundPos === -1 && lastSeenText) {
+      log(`  [순위 조회 디버그] 매칭 실패. 찾던 스니펫: "${matchSnippet}" / 한글키: "${matchKor}"`);
       log(`  [순위 조회 디버그] 마지막 API 텍스트: "${lastSeenText.substring(0, 60)}"`);
     }
 
-    const policy = foundPos <= 0 ? null
+    const policy = foundPos === -2 ? '✅ 100위 밖 → 답변으로 충분'
+      : foundPos <= 0 ? null
       : foundPos <= 10 ? '⚠️ 1~10위 → 아주 적극 대응 (조건 환불 검토)'
       : foundPos <= 20 ? '🔶 11~20위 → 적극 대응 (답변 or 환불)'
       : foundPos <= 40 ? '🔷 21~40위 → 답변 우선 (필요시 환불)'
@@ -1853,11 +2161,13 @@ async function findReviewPosition(browser, productName, reviewText) {
     if (foundPos > 0) {
       log(`  📍 리뷰 순위: ${foundPos}번째 (총 검색: ${globalPos}개)`);
       log(`  📋 대응 정책: ${policy}`);
+    } else if (outOfTop100) {
+      log(`  📍 리뷰 순위: 100위 밖 (상위 ${globalPos}개 검색 후 미발견)`);
     } else {
-      log(`  [순위 조회] 리뷰를 찾지 못함 (이미 삭제되었거나 ${globalPos}개 내 미발견)`);
+      log(`  [순위 조회] 리뷰를 찾지 못함 (API 오류 또는 매핑 문제. 검색된 리뷰: ${globalPos}개)`);
     }
 
-    return { position: foundPos, policy, productUrl };
+    return { position: foundPos, policy, productUrl, searchedCount: globalPos };
 
   } catch(e) {
     log(`  [순위 조회 오류] ${e.message}`);
@@ -1983,7 +2293,16 @@ async function main() {
       const inputHandle = await selectizeEl.$('.selectize-input');
       if (inputHandle) {
         await inputHandle.click();
-        await sleep(500);
+        // 드롭다운이 실제로 열릴 때까지 최대 3초 대기 (아침 부하 시 500ms 고정으로는 부족)
+        for (let i = 0; i < 15; i++) {
+          const open = await page.evaluate(() => {
+            const d = document.querySelector('.selectize-dropdown-content');
+            return d && d.offsetHeight > 0;
+          });
+          if (open) break;
+          await sleep(200);
+        }
+        await sleep(200); // 옵션 렌더링 완료 buffer
       }
 
       // 2. 드롭다운 옵션에서 '답글미등록' 클릭
@@ -2141,8 +2460,11 @@ async function main() {
       // ── 리뷰 순위 조회 (전체 공통) ─────────────────
       log(`  🔍 리뷰 순위 조회 중...`);
       try {
-        const posResult = await findReviewPosition(browser, nextRow.productName, nextRow.reviewText);
-        result.reviewPosition = posResult.position > 0 ? posResult.position : 0;
+        const posResult = await findReviewPosition(browser, nextRow.productName, nextRow.reviewText, nextRow.writer);
+        // position > 0 = 순위, -2 = 100위 밖, 그 외 = 미확인(0)
+        result.reviewPosition = posResult.position > 0
+          ? posResult.position
+          : (posResult.position === -2 ? -2 : 0);
         result.productUrl     = posResult.productUrl || '';
         if (posResult.position > 0) log(`  📍 리뷰 순위: ${posResult.position}번째`);
         else                        log(`  📍 리뷰 순위: 미확인`);
@@ -2359,8 +2681,10 @@ async function main() {
       log(`\n[요약] ${summaryFile} 저장됨`);
 
       // Word 문서 생성
+      let docxFilepath = null;
       try {
-        const { filename: docxName } = await generateWordDoc(summary);
+        const { filename: docxName, filepath } = await generateWordDoc(summary);
+        docxFilepath = filepath;
         log(`[Word] 저장 완료: ${docxName}`);
       } catch(e) {
         log(`[Word 오류] ${e.message}`);
@@ -2368,6 +2692,12 @@ async function main() {
 
       // Slack 채널 자동 전송
       await sendSlackDM(summary);
+
+      // Slack 채널에 워드 파일 첨부 업로드
+      if (docxFilepath) {
+        const channelId = cfg.SLACK_CHANNEL_ID || cfg.SLACK_USER_ID || 'U08KNE04HKK';
+        await uploadFileToSlack(docxFilepath, channelId, `📎 ${summary.date} 보고서 워드 파일`);
+      }
     }
 
     await browser.close();
@@ -2375,9 +2705,13 @@ async function main() {
   }
 }
 
-main().catch(err => {
+main().catch(async err => {
   console.error('\n[오류]', err.message);
   const lockFile = path.join(__dirname, '.posting.lock');
   try { fs.unlinkSync(lockFile); } catch(e) {}
+  // 스케줄 실행 중 오류면 Slack으로 즉시 알림
+  if (process.argv.includes('--scheduled')) {
+    await sendSlackError(err.message).catch(() => {});
+  }
   process.exit(1);
 });
