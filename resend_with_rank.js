@@ -219,10 +219,22 @@ async function generateWordDoc(summary, dateStr) {
       spacing: { before: 100, after: 100 }, shading: { fill: 'D9E1F2', type: ShadingType.CLEAR },
       children: [label('작업 요약', true, 24)],
     }),
-    new Paragraph({ spacing: { after: 80 }, children: [label(`• 조건: 1주일 작성 + 답글미등록 / Claude Sonnet API`)] }),
+    new Paragraph({ spacing: { after: 80 }, children: [label(`• 조건: 1주일 작성 + 답글미등록`)] }),
+    new Paragraph({
+      spacing: { after: 80 },
+      children: [label(`• 총 처리: ${summary.replied}개 완료 ✅   |   환불검토: ${summary.refund}개   |   실패: ${summary.failed}개`)],
+    }),
+    new Paragraph({
+      spacing: { after: 80 },
+      children: [label(`• 실행환경 : ${summary.executionEnv || '백그라운드 자동 (Anthropic API 직접 호출)'}`)],
+    }),
+    new Paragraph({
+      spacing: { after: 80 },
+      children: [label(`• AI 모델 : ${summary.aiModel || 'claude-sonnet-4-5'}`)],
+    }),
     new Paragraph({
       spacing: { after: summary.usage ? 80 : 300 },
-      children: [label(`• 총 처리: ${summary.replied}개 완료 ✅   |   환불검토: ${summary.refund}개   |   실패: ${summary.failed}개`)],
+      children: [label(`• 비용 : ${summary.cost || (summary.usage && summary.usage.costKRW != null ? `약 ₩${summary.usage.costKRW.toLocaleString()} ($${summary.usage.costUSD})` : '-')}`)],
     }),
     ...(summary.usage ? [new Paragraph({
       spacing: { after: 300 },

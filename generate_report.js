@@ -33,6 +33,14 @@ const skipSlack = argv.includes('--no-slack');
   // posted_results.json 의 results 가 이미 호환 형식임 (writer/productName/judgeLabel/...)
   log(`[입력] ${inPath} (${summary.results?.length || 0} 건)`);
 
+  // ── 에이전트 매개 실행 디폴트 메타 주입 (값 없으면 채움) ──
+  // 환경변수로 모델명 오버라이드 가능: COEIR_AI_MODEL
+  if (!summary.executionEnv) summary.executionEnv = '윈도우 Claude Code 클라이언트 앱';
+  if (!summary.aiModel)      summary.aiModel      = process.env.COEIR_AI_MODEL || 'Claude Sonnet 4.5 (Claude Code Max 구독)';
+  if (!summary.cost)         summary.cost         = '₩0 (Claude Code Max 구독 포함)';
+  // 에이전트 매개 모드에선 API 토큰/비용 추적이 없으므로 summary.usage 는 미설정.
+  // 위 3개 디폴트 라인이 작업 요약에 표시된다.
+
   // .review_summary.json 으로도 저장 (resend_with_rank.js 등과 호환)
   const stdSummaryPath = path.join(__dirname, '.review_summary.json');
   fs.writeFileSync(stdSummaryPath, JSON.stringify(summary, null, 2), 'utf8');

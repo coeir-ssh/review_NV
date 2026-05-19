@@ -861,18 +861,23 @@ function getProductKnowledge(productName) {
 
   if (isStainless && !name.includes('테라조')) {
     k.push(`[스테인리스 라인 공통]
-- SUS304 (녹·부식에 강함) / 안티 핑거프린트 코팅 (AFC) / 브러쉬드 피니쉬 기법 / 샌드블라스팅·전해 연마
-- 물빠짐 구조로 물때·곰팡이 방지, 위생적이고 내구성 우수`);
+- SUS304 (녹·부식에 강함) / 브러쉬드 피니쉬 기법 / 샌드블라스팅·전해 연마
+- 물빠짐 구조로 물때·곰팡이 방지, 위생적이고 내구성 우수
+- 🚨 **안티 핑거프린트 코팅(AFC) 은 일부 제품에만 적용됨**:
+  - AFC 적용 ✅: 디스펜서 / 트레이 / 멀티홀더 / 욕실선반
+  - AFC 미적용 ❌: **비누받침대, 칫솔꽂이** — 답변에 AFC 언급 금지`);
   }
   if (name.includes('비누받침') && !name.includes('테라조')) {
     k.push(`[스테인리스 비누받침대] (22,000원 / A·B·C 타입 3종)
-- 카피: "SUS304와 안티 핑거프린트 코팅 (AFC), 마감·구조까지 섬세하게 - 코에르가 만든 스테인리스 기준"
+- 카피: "SUS304, 마감·구조까지 섬세하게 - 코에르가 만든 스테인리스 기준"
 - USP: 원활한 배수 (비누 무름 방지) / SUS304 / 뛰어난 내구성 / 세심히 선정한 사이즈 / 고급스러운 디자인
-- 무게감 있는 고급스러움, 타입별 디자인 차이 있음`);
+- 무게감 있는 고급스러움, 타입별 디자인 차이 있음
+- 🚨 **AFC(안티 핑거프린트 코팅) 미적용 제품** — 답변에 AFC 언급 금지`);
   }
   if (name.includes('칫솔') && !name.includes('테라조')) {
     k.push(`[스테인리스 칫솔꽂이] (27,000원)
-- USP: SUS304 / 물고임 방지 6개 배수 라인 / 활용도 높은 다기능 파티션 / 칫솔 이탈 방지 거치 레이어 / 샌드블라스팅·전해 연마 공법 / 유니크한 스퀘어 오벌 디자인`);
+- USP: SUS304 / 물고임 방지 6개 배수 라인 / 활용도 높은 다기능 파티션 / 칫솔 이탈 방지 거치 레이어 / 샌드블라스팅·전해 연마 공법 / 유니크한 스퀘어 오벌 디자인
+- 🚨 **AFC(안티 핑거프린트 코팅) 미적용 제품** — 답변에 AFC 언급 금지`);
   }
   if (name.includes('멀티홀더') && !name.includes('테라조')) {
     k.push(`[스테인리스 멀티홀더] (25,000원)
@@ -1043,7 +1048,8 @@ async function generateReply(review) {
 
 [브랜드 공통 소재 지식]
 - 테라조 라인: 레진 기반, 천연스톤을 하나하나 담은 100% 핸드메이드. "천연스톤과 레진을 조합하여 만든 저희 테라조 제품은" 표현은 설명이 필요한 맥락에서만 사용
-- 스테인리스 라인: SUS304, 안티 핑거프린트 코팅 (AFC), 브러쉬드 피니쉬 기법, 무타공이어도 튼튼하게 고정됨
+- 스테인리스 라인: SUS304, 브러쉬드 피니쉬 기법, 무타공이어도 튼튼하게 고정됨
+  - 🚨 **AFC(안티 핑거프린트 코팅) 은 일부 제품에만 적용** — 적용 ✅: 디스펜서/트레이/멀티홀더/욕실선반 / 미적용 ❌: **비누받침대, 칫솔꽂이** (이 두 제품 답변엔 AFC 언급 금지)
 - 규조토 발매트: '워셔블 레더 규조토 발매트' — 세탁 가능, 부드럽고 얼룩·세균 걱정 없음. 'KC마크 획득 제품' (KC인증 X)
 - 타월: 40수 '슈퍼 코마사' (그냥 '코마사' 아님), GOTS 최고 등급 오가닉 코튼, OEKO-TEX 1등급
 - 욕실화(발리콘): 묵직한 무게감으로 미끄럼을 확실히 잡아주는 '안전·착화감' 포지션. '가볍다' 강조 금지
@@ -1219,8 +1225,11 @@ async function sendSlackDM(summary) {
   const lines = [
     `안녕하세요! 오늘(${dateStr}) 코에르 리뷰 자동 답변 작업 완료 보고드립니다 😊`,
     `작업 요약`,
-    `• 조건: 1주일 작성 + 답글미등록 / Claude Sonnet API`,
+    `• 조건: 1주일 작성 + 답글미등록`,
     `• 총 처리: ${summary.replied}개 완료 ✅  |  환불검토: ${summary.refund}개  |  실패: ${summary.failed}개`,
+    `• 실행환경 : ${summary.executionEnv || '백그라운드 자동 (Anthropic API 직접 호출)'}`,
+    `• AI 모델 : ${summary.aiModel || (CONFIG.MODEL || 'claude-sonnet-4-5')}`,
+    `• 비용 : ${summary.cost || (u.costKRW != null ? `약 ₩${(u.costKRW||0).toLocaleString()} ($${(u.costUSD||0).toFixed(4)})` : '-')}`,
     ...(usageLine ? [usageLine] : []),
     ``,
   ];
@@ -1368,11 +1377,23 @@ async function generateWordDoc(summary) {
     }),
     new Paragraph({
       spacing: { after: 80 },
-      children: [label(`• 조건: 1주일 작성 + 답글미등록 / Claude Sonnet API`)],
+      children: [label(`• 조건: 1주일 작성 + 답글미등록`)],
+    }),
+    new Paragraph({
+      spacing: { after: 80 },
+      children: [label(`• 총 처리: ${summary.replied}개 완료 ✅   |   환불검토: ${summary.refund}개   |   실패: ${summary.failed}개`)],
+    }),
+    new Paragraph({
+      spacing: { after: 80 },
+      children: [label(`• 실행환경 : ${summary.executionEnv || '백그라운드 자동 (Anthropic API 직접 호출)'}`)],
+    }),
+    new Paragraph({
+      spacing: { after: 80 },
+      children: [label(`• AI 모델 : ${summary.aiModel || (CONFIG.MODEL || 'claude-sonnet-4-5')}`)],
     }),
     new Paragraph({
       spacing: { after: summary.usage ? 80 : 300 },
-      children: [label(`• 총 처리: ${summary.replied}개 완료 ✅   |   환불검토: ${summary.refund}개   |   실패: ${summary.failed}개`)],
+      children: [label(`• 비용 : ${summary.cost || (summary.usage && summary.usage.costKRW != null ? `약 ₩${summary.usage.costKRW.toLocaleString()} ($${summary.usage.costUSD})` : '-')}`)],
     }),
     ...(summary.usage ? [new Paragraph({
       spacing: { after: 300 },
