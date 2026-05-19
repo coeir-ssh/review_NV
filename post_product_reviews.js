@@ -2705,13 +2705,64 @@ async function main() {
   }
 }
 
-main().catch(async err => {
-  console.error('\n[오류]', err.message);
-  const lockFile = path.join(__dirname, '.posting.lock');
-  try { fs.unlinkSync(lockFile); } catch(e) {}
-  // 스케줄 실행 중 오류면 Slack으로 즉시 알림
-  if (process.argv.includes('--scheduled')) {
-    await sendSlackError(err.message).catch(() => {});
-  }
-  process.exit(1);
-});
+// ─────────────────────────────────────────────────────────
+// 모듈 export — 다른 스크립트(`collect_pending.js`, `post_replies.js`,
+// 에이전트 routine 등)가 puppeteer/리포트 헬퍼를 재사용할 수 있도록 노출
+// ─────────────────────────────────────────────────────────
+module.exports = {
+  // 설정
+  CONFIG,
+  // 로그인 / 네비게이션
+  loginToSellerCenter,
+  ensureCoeirStore,
+  switchToCoeirStore,
+  dismissBlockingModals,
+  // 그리드 / 행 조작
+  collectVisibleRows,
+  scrollDown,
+  deselectAllRows,
+  getCheckedCount,
+  clickRowCheckbox,
+  clickReplyButton,
+  typeReplyText,
+  clickSubmit,
+  checkAndClosePopup,
+  closeModal,
+  postReply,
+  // brand.naver.com 순위 조회
+  findReviewPosition,
+  getProductNaverIds,
+  findProductNaverId,
+  normalizeReviewText,
+  koreanOnlyKey,
+  // 리포트
+  generateWordDoc,
+  sendSlackDM,
+  uploadFileToSlack,
+  sendSlackError,
+  // 지식 / 분류 (옵션 — 에이전트가 직접 추론할 때 참고용)
+  getProductKnowledge,
+  // 토큰 사용량 추적 (에이전트 매개 실행에선 미사용)
+  accumulateUsage,
+  getUsageSummary,
+  // 표시 헬퍼
+  formatReviewPosition,
+  resolveDisplayOption,
+  rankSortKey,
+  sortByRank,
+  shouldShowJudgeReason,
+};
+
+// CLI 직접 실행 시에만 main() 호출 — `require()` 로 import 할 땐 자동 실행 안 됨
+if (require.main === module) {
+  main().catch(async err => {
+    console.error('\n[오류]', err.message);
+    const lockFile = path.join(__dirname, '.posting.lock');
+    try { fs.unlinkSync(lockFile); } catch(e) {}
+    // 스케줄 실행 중 오류면 Slack으로 즉시 알림
+    if (process.argv.includes('--scheduled')) {
+      await sendSlackError(err.message).catch(() => {});
+    }
+    process.exit(1);
+  });
+}
