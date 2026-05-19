@@ -9,6 +9,12 @@ holidays_cache.json
 logs/
 reply/
 
+# 에이전트 매개 워크플로우 중간 산출물
+pending_reviews.json
+replies.json
+posted_results.json
+_tmp_*.js
+
 # Node
 node_modules/
 npm-debug.log*

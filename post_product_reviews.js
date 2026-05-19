@@ -1650,9 +1650,9 @@ async function collectVisibleRows(page) {
       const colKeys = Object.keys(cellByColId);
 
       // ── 리뷰글번호 / 채널번호 (productNaverId 충돌 방지) ──
-      // col-id 우선 시도: 'reviewNo', 'reviewSeq', 'review_id' 류
-      const reviewColKey = colKeys.find(k => /^review.*(no|id|seq)$/i.test(k) || /reviewNo|reviewId|reviewSeq/.test(k));
-      const channelColKey = colKeys.find(k => /channel.*(no|id|product)|productNo|productId/i.test(k));
+      // 셀러센터 답글미등록 페이지 실측 col-id: id=리뷰글번호, productNo=채널상품번호
+      const reviewColKey = colKeys.find(k => k === 'id' || /^review.*(no|id|seq)$/i.test(k) || /reviewNo|reviewId|reviewSeq/.test(k));
+      const channelColKey = colKeys.find(k => k === 'productNo' || /channel.*(no|id|product)|productNo|productId/i.test(k));
       const knownPidSet = (typeof window.__COEIR_PRODUCT_IDS__ !== 'undefined') ? new Set(window.__COEIR_PRODUCT_IDS__) : new Set();
       const allNumeric = texts.filter(t => /^\d{8,12}$/.test(t));
       // 알려진 productNaverId 는 제외
