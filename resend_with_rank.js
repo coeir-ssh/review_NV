@@ -249,7 +249,7 @@ async function generateWordDoc(summary, dateStr) {
 
     // ── 답변 완료
     new Paragraph({ spacing: { before: 200, after: 160 }, children: [label('■ 답변 완료 항목', true, 24)] }),
-    ...sortByRank(summary.results.filter(r => r.replyText)).flatMap((r, i) => [
+    ...sortByRank(summary.results.filter(r => r.replyText && r.refundCheck !== '검토필요')).flatMap((r, i) => [
       new Paragraph({ spacing: { before: 200, after: 80 }, shading: { fill: GRAY, type: ShadingType.CLEAR }, children: [label(`No.${i + 1}`, true, 22)] }),
       new Paragraph({ spacing: { after: 60 }, children: [label('리뷰글번호 : ', true), label(r.reviewNo || '-')] }),
       new Paragraph({ spacing: { after: 60 }, children: [label('등록자 : ', true), label(r.writer)] }),
@@ -315,6 +315,10 @@ async function generateWordDoc(summary, dateStr) {
           ...(r.judgeReason ? [new Paragraph({ spacing: { after: 60 }, children: [
             new TextRun({ text: '💭 판단 근거 : ', bold: true, size: 22, font: 'Malgun Gothic', color: 'C00000' }),
             new TextRun({ text: `${r.judgeReason}${r.judgeConfidence != null ? ` (confidence ${r.judgeConfidence})` : ''}`, font: 'Malgun Gothic', size: 22, bold: true, color: 'C00000' }),
+          ] })] : []),
+          ...(r.replyText ? [new Paragraph({ spacing: { after: 60 }, children: [
+            new TextRun({ text: '💬 답변 대응시 : ', bold: true, size: 22, font: 'Malgun Gothic', color: '7030A0' }),
+            new TextRun({ text: `"${r.replyText}"`, font: 'Malgun Gothic', size: 22, color: '7030A0' }),
           ] })] : []),
           new Paragraph({ spacing: { after: 80 }, children: [] }),
           new Paragraph({ spacing: { after: 160 }, children: [label('피드백 : ', true)] }),
@@ -420,7 +424,7 @@ async function sendSlack(summary) {
   lines.push(``);
 
   // 답변 완료
-  const repliedList = sortByRank(summary.results.filter(r => r.replyText));
+  const repliedList = sortByRank(summary.results.filter(r => r.replyText && r.refundCheck !== '검토필요'));
   if (repliedList.length > 0) {
     repliedList.forEach((r, i) => {
       lines.push(`─────────────────────────────`);
@@ -463,6 +467,9 @@ async function sendSlack(summary) {
       }
       if (r.judgeReason) {
         lines.push(`*🔴 판단 근거 : ${r.judgeReason}${r.judgeConfidence != null ? ` (confidence ${r.judgeConfidence})` : ''}*`);
+      }
+      if (r.replyText) {
+        lines.push(`💬 답변 대응시 : "${r.replyText}"`);
       }
       lines.push(``);
     });
