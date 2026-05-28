@@ -2826,6 +2826,9 @@ module.exports = {
   // 토큰 사용량 추적 (에이전트 매개 실행에선 미사용)
   accumulateUsage,
   getUsageSummary,
+  // 영업일 가드 (주말/공휴일 자동 스킵)
+  shouldSkipToday,
+  getKoreanHolidays,
   // 표시 헬퍼
   formatReviewPosition,
   resolveDisplayOption,

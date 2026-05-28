@@ -22,6 +22,7 @@ const {
   collectVisibleRows,
   scrollDown,
   findReviewPosition,
+  shouldSkipToday,
 } = require('./post_product_reviews');
 
 const log   = msg => console.log(msg);
@@ -38,6 +39,31 @@ const outFile = outArg ? outArg.split('=')[1] : 'pending_reviews.json';
   log('║   collect_pending.js — 답글미등록 리뷰 수집 (AI 없음)       ║');
   log('╚══════════════════════════════════════════════════════════════╝');
   log('');
+
+  // ── 영업일 가드 (주말/공휴일 자동 스킵) ──────────────
+  // --force 플래그 있으면 가드 무시 (수동 실행 / 테스트용)
+  const force = process.argv.includes('--force');
+  if (!force) {
+    const { skip, reason } = await shouldSkipToday();
+    if (skip) {
+      log(`[영업일 가드] ${reason} → 자동 답변 작업 건너뜀.`);
+      // pending_reviews.json 에 skip 마커 작성 → 에이전트가 후속 단계 스킵 판단 가능
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}. ${now.getMonth() + 1}. ${now.getDate()}.`;
+      const out = {
+        date: dateStr,
+        collectedAt: now.toISOString(),
+        skipped: true,
+        skipReason: reason,
+        totalReviews: 0,
+        reviews: [],
+      };
+      const outPath = path.isAbsolute(outFile) ? outFile : path.join(__dirname, outFile);
+      fs.writeFileSync(outPath, JSON.stringify(out, null, 2), 'utf8');
+      log(`[영업일 가드] ${outPath} 에 skip 마커 작성 후 정상 종료 (exit 0)`);
+      process.exit(0);
+    }
+  }
 
   const browser = await puppeteer.launch({
     headless:        CONFIG.headless,

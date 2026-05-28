@@ -61,11 +61,20 @@ for (const p of products) {
 node collect_pending.js
 ```
 
+영업일 가드 동작 (`shouldSkipToday`):
+- **주말 (토·일) 또는 한국 공휴일** (data.go.kr API + holidays_cache.json) 이면 즉시 종료
+- 이 경우 `pending_reviews.json` 에 `skipped: true, skipReason: '주말'` 또는 `'공휴일 (YYYY-MM-DD)'` 작성됨
+- 가드 무시하고 강제 실행하려면 `--force` 플래그 추가
+
 성공 시 `pending_reviews.json` 생성. 다음 필드를 포함:
 - `date`, `collectedAt`, `totalReviews`
+- `skipped`: 영업일 아니면 true (이때 후속 Step 모두 생략)
 - `reviews[]`: `{ no, writer, reviewNo, productName, optionName, rating, date, reviewText, reviewPosition, productUrl, posPolicy, searchedCount, ... }`
 
-수집된 리뷰가 0건이면 Step 2~4 생략, Slack 에 "오늘 답글미등록 리뷰 없음" 알림만.
+**Step 1 종료 후 분기:**
+- `skipped === true` → **Step 2~4 모두 생략**, Slack 에 "📅 오늘은 영업일이 아닙니다 ({skipReason}) — 자동 작업 스킵" 알림만 보내고 종료
+- `totalReviews === 0` → Step 2~4 생략, Slack 에 "오늘 답글미등록 리뷰 없음" 알림만
+- 그 외 → Step 2 로 진행
 
 ---
 
