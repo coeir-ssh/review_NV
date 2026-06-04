@@ -811,6 +811,9 @@ function getProductKnowledge(productName) {
   → 환불 사유 아님. **원래 이 제품은 욕실 크기와 사용 공간이 다양해서, 용도에 맞게 여러 개 조합해 붙여 쓰도록 설계된 제품**. 이를 자연스럽게 안내
   → 🚨 금지 표현: "공간에 더 잘 맞는 사이즈를 안내해드리지 못한 점 아쉽습니다" — 절대 사용 금지 (제품 의도와 어긋남)
   → 권장 톤: "**S/M/L 3가지 사이즈를 공간 형태에 맞게 자유롭게 조합·연결하여 사용**하실 수 있도록 설계되어 있어요. 두 개를 붙여 쓰시면 욕실 모양에 딱 맞춰지죠!"
+- ★ [사이즈가 작다 + 가격 비싸다 동반 리뷰 — 최대 사이즈 디펜스]
+  → 핵심 디펜스: "저희 제품의 가장 큰 장점은 **한 손으로 들고 세척이 가능할 만큼 가볍다**는 점이에요. 사이즈가 더 크면 한 손 세척이 어려워, 세척 편의를 위해 **가장 큰 사이즈를 60×90cm 로 설계**했습니다. 더 넓은 공간이 필요하시면 **여러 장을 붙여 사용**하실 수 있도록 작은 사이즈도 함께 제공하고 있어요"
+  → 가벼움(한 손 세척) ↔ 사이즈 한계가 트레이드오프임을 설명하면 가격·사이즈 불만이 동시에 풀림
 - ★ [사이즈 실제와 차이가 난다 리뷰]
   → 디펜스: "**제조 공정 특성상 ±1cm 정도 미세한 오차는 발생**할 수 있으나 거의 정확합니다. 다만 **받자마자 사용하시면 끝부분이 약간 말려 있어 실제 사이즈보다 작게 느껴질 수 있는데**, 평평하게 펴서 잠시 두시면 자연스럽게 원상복귀 됩니다" 톤
 - ★ [물이 고인다 / 매트 밑에 물 고임 리뷰] — 사용 가이드 안내
@@ -881,7 +884,10 @@ function getProductKnowledge(productName) {
 - ★ [발등이 낮다는 리뷰 — 의도된 설계, 장점으로 리프레이밍]
   → "발등이 낮은" 디자인은 의도된 설계 포인트. 욕실 문턱·문 사이에 **"걸릴 일이 적다 / 잘 걸리지 않는다"** 부드러운 톤으로 안내
   → 🚨 "절대 걸리지 않는다 / 욕실문에 걸리지 않는 욕실화" 같은 단정 금지 (문 사이즈에 따라 다름)
-  → 권장 톤: "발등이 낮은 디자인 덕분에 욕실 문턱이나 문 사이에 **잘 걸리지 않아** 편하게 신고 벗으실 수 있어요"`);
+  → 권장 톤: "발등이 낮은 디자인 덕분에 욕실 문턱이나 문 사이에 **잘 걸리지 않아** 편하게 신고 벗으실 수 있어요"
+- ★ [발등이 낮아 불편하다 / 발등 낮은 게 아쉽다는 부정 뉘앙스 리뷰]
+  → 발등이 높지 않아도 **착화감이 불편하지 않도록 설계**되어 **많은 고객님들께서 편안하게 신고 계신다**는 톤으로 안내
+  → 권장 톤: "발등 라인을 낮게 디자인했지만 착화감이 불편하지 않도록 신경 써 설계해, 많은 고객님들께서 편하게 신고 계세요. 신고 벗기 편하고 문턱에도 잘 걸리지 않는 장점도 함께 느껴보세요"`);
   }
 
   // ── 스테인리스 제품 공통 ────────────────────────
@@ -1284,32 +1290,7 @@ async function sendSlackDM(summary) {
     ``,
   ];
 
-  // ── 답변 완료 리뷰 목록 ───────────────────────────
-  const repliedList = sortByRank(summary.results.filter(r => r.replyText && r.refundCheck !== '검토필요'));
-  if (repliedList.length > 0) {
-    repliedList.forEach((r, i) => {
-      lines.push(`─────────────────────────────`);
-      lines.push(`No.${i + 1}`);
-      lines.push(`리뷰글번호 : ${r.reviewNo || '-'}`);
-      lines.push(`등록자 : ${r.writer}`);
-      lines.push(`제품명 : ${getMasterProductName(r.productName)}`);
-      { const opt = resolveDisplayOption(r); if (opt) lines.push(`구매 옵션 : ${opt}`); }
-      lines.push(`별점 : ${stars(r.rating)} (${r.rating}점)`);
-      lines.push(`리뷰순위 : ${formatReviewPosition(r.reviewPosition)}`);
-      lines.push(`리뷰 : "${r.reviewText.replace(/\n/g, ' ')}"`);
-      if (r.judgeLabel) {
-        lines.push(`*🏷️ 판단 : ${r.judgeLabel}*`);
-      }
-      // 판단 근거: 환불검토 + 답변이라도 confidence 낮으면(< 90) 표시
-      if (shouldShowJudgeReason(r)) {
-        lines.push(`*🔴 판단 근거 : ${r.judgeReason}${r.judgeConfidence != null ? ` (confidence ${r.judgeConfidence})` : ''}*`);
-      }
-      lines.push(`답변 : "${r.replyText}"`);
-      lines.push(``);
-    });
-  }
-
-  // ── 환불검토 항목 ─────────────────────────────────
+  // ── 환불검토 항목 (먼저 표시) ─────────────────────
   const refundList = sortByRank(summary.results.filter(r => r.refundCheck === '검토필요'));
   if (refundList.length > 0) {
     lines.push(`─────────────────────────────`);
@@ -1332,6 +1313,33 @@ async function sendSlackDM(summary) {
       if (r.replyText) {
         lines.push(`💬 답변 대응시 : "${r.replyText}"`);
       }
+      lines.push(``);
+    });
+  }
+
+  // ── 답변 완료 리뷰 목록 (환불검토 다음) ───────────
+  const repliedList = sortByRank(summary.results.filter(r => r.replyText && r.refundCheck !== '검토필요'));
+  if (repliedList.length > 0) {
+    lines.push(`─────────────────────────────`);
+    lines.push(`■ 답변 완료 항목 (${repliedList.length}건)`);
+    repliedList.forEach((r, i) => {
+      lines.push(`─────────────────────────────`);
+      lines.push(`No.${i + 1}`);
+      lines.push(`리뷰글번호 : ${r.reviewNo || '-'}`);
+      lines.push(`등록자 : ${r.writer}`);
+      lines.push(`제품명 : ${getMasterProductName(r.productName)}`);
+      { const opt = resolveDisplayOption(r); if (opt) lines.push(`구매 옵션 : ${opt}`); }
+      lines.push(`별점 : ${stars(r.rating)} (${r.rating}점)`);
+      lines.push(`리뷰순위 : ${formatReviewPosition(r.reviewPosition)}`);
+      lines.push(`리뷰 : "${r.reviewText.replace(/\n/g, ' ')}"`);
+      if (r.judgeLabel) {
+        lines.push(`*🏷️ 판단 : ${r.judgeLabel}*`);
+      }
+      // 판단 근거: 환불검토 + 답변이라도 confidence 낮으면(< 90) 표시
+      if (shouldShowJudgeReason(r)) {
+        lines.push(`*🔴 판단 근거 : ${r.judgeReason}${r.judgeConfidence != null ? ` (confidence ${r.judgeConfidence})` : ''}*`);
+      }
+      lines.push(`답변 : "${r.replyText}"`);
       lines.push(``);
     });
   }
@@ -1460,7 +1468,62 @@ async function generateWordDoc(summary) {
 
     divider(),
 
-    // ── 답변 완료 리뷰 ────────────────────────────────────
+    // ── 환불검토 항목 (먼저 표시) ─────────────────────────
+    ...(() => {
+      const list = sortByRank(summary.results.filter(r => r.refundCheck === '검토필요'));
+      if (!list.length) return [];
+      return [
+        new Paragraph({
+          spacing: { before: 200, after: 160 },
+          children: [label('⚠️ 환불검토 필요 항목', true, 24)],
+        }),
+        ...list.flatMap((r, i) => [
+          new Paragraph({
+            spacing: { before: 160, after: 80 },
+            shading: { fill: 'FFF2CC', type: ShadingType.CLEAR },
+            children: [label(`No.${i + 1}   `, true), ...starRuns(r.rating, { bold: true }), label(` (${r.rating}점)   |   ${r.writer}`, true)],
+          }),
+          new Paragraph({ spacing: { after: 60 }, children: [label('리뷰글번호 : ', true), label(r.reviewNo || '-')] }),
+          new Paragraph({ spacing: { after: 60 }, children: [label('제품명 : ', true), label(getMasterProductName(r.productName))] }),
+          ...((opt => opt ? [new Paragraph({ spacing: { after: 60 }, children: [label('구매 옵션 : ', true), label(opt)] })] : [])(resolveDisplayOption(r))),
+          new Paragraph({ spacing: { after: 60 }, children: [label('별점 : ', true), ...starRuns(r.rating), label(` (${r.rating}점)`)] }),
+          ...(r.reviewPosition > 0 ? [
+            new Paragraph({ spacing: { after: 60 }, children: [
+              label('📍 리뷰 순위 : ', true),
+              new TextRun({ text: `${r.reviewPosition}위 (랭킹순)`, font: 'Malgun Gothic', size: 22, bold: true, color: 'C00000' }),
+            ] }),
+            new Paragraph({ spacing: { after: 60 }, children: [
+              label('📋 대응 정책 : ', true),
+              new TextRun({ text: r.refundPolicy || '', font: 'Malgun Gothic', size: 22, bold: true, color: '833C00' }),
+            ] }),
+          ] : [
+            new Paragraph({ spacing: { after: 60 }, children: [label('리뷰순위 : ', true), new TextRun({ text: formatReviewPosition(r.reviewPosition), font: 'Malgun Gothic', size: 22, color: r.reviewPosition === -2 ? '888888' : '000000' })] }),
+            ...(r.refundPolicy ? [new Paragraph({ spacing: { after: 60 }, children: [label('📋 대응 정책 : ', true), label(r.refundPolicy)] })] : []),
+          ]),
+          new Paragraph({ spacing: { after: 60 }, children: [
+            label('리뷰 : ', true),
+            new TextRun({ text: `"${r.reviewText.replace(/\n/g, ' ')}"`, font: 'Malgun Gothic', size: 22, italics: true }),
+          ] }),
+          ...(r.judgeLabel ? [new Paragraph({ spacing: { after: 60 }, children: [
+            new TextRun({ text: '🏷️ 판단 : ', bold: true, size: 22, font: 'Malgun Gothic' }),
+            new TextRun({ text: r.judgeLabel, bold: true, size: 22, font: 'Malgun Gothic', color: r.judgeLabel === '환불검토' ? 'C00000' : '2E7D32' }),
+          ] })] : []),
+          ...(r.judgeReason ? [new Paragraph({ spacing: { after: 60 }, children: [
+            new TextRun({ text: '💭 판단 근거 : ', bold: true, size: 22, font: 'Malgun Gothic', color: 'C00000' }),
+            new TextRun({ text: `${r.judgeReason}${r.judgeConfidence != null ? ` (confidence ${r.judgeConfidence})` : ''}`, font: 'Malgun Gothic', size: 22, bold: true, color: 'C00000' }),
+          ] })] : []),
+          ...(r.replyText ? [new Paragraph({ spacing: { after: 60 }, children: [
+            new TextRun({ text: '💬 답변 대응시 : ', bold: true, size: 22, font: 'Malgun Gothic', color: '7030A0' }),
+            new TextRun({ text: `"${r.replyText}"`, font: 'Malgun Gothic', size: 22, color: '7030A0' }),
+          ] })] : []),
+          new Paragraph({ spacing: { after: 80 }, children: [] }),
+          new Paragraph({ spacing: { after: 160 }, children: [label('피드백 : ', true)] }),
+        ]),
+        divider(),
+      ];
+    })(),
+
+    // ── 답변 완료 리뷰 (환불검토 다음) ────────────────────
     new Paragraph({
       spacing: { before: 200, after: 160 },
       children: [label('■ 답변 완료 항목', true, 24)],
@@ -1522,89 +1585,6 @@ async function generateWordDoc(summary) {
     ]),
 
     divider(),
-
-    // ── 환불검토 항목 ─────────────────────────────────────
-    ...(() => {
-      const list = sortByRank(summary.results.filter(r => r.refundCheck === '검토필요'));
-      if (!list.length) return [];
-      return [
-        new Paragraph({
-          spacing: { before: 200, after: 160 },
-          children: [label('⚠️ 환불검토 필요 항목', true, 24)],
-        }),
-        ...list.flatMap((r, i) => [
-          new Paragraph({
-            spacing: { before: 160, after: 80 },
-            shading: { fill: 'FFF2CC', type: ShadingType.CLEAR },
-            children: [label(`No.${i + 1}   `, true), ...starRuns(r.rating, { bold: true }), label(` (${r.rating}점)   |   ${r.writer}`, true)],
-          }),
-          new Paragraph({ spacing: { after: 60 }, children: [label('리뷰글번호 : ', true), label(r.reviewNo || '-')] }),
-          new Paragraph({ spacing: { after: 60 }, children: [label('제품명 : ', true), label(getMasterProductName(r.productName))] }),
-          ...((opt => opt ? [new Paragraph({ spacing: { after: 60 }, children: [label('구매 옵션 : ', true), label(opt)] })] : [])(resolveDisplayOption(r))),
-          new Paragraph({ spacing: { after: 60 }, children: [label('별점 : ', true), ...starRuns(r.rating), label(` (${r.rating}점)`)] }),
-          // 순위 / 정책 (환불검토 대상에만, 제품명 바로 다음)
-          ...(r.reviewPosition > 0 ? [
-            new Paragraph({
-              spacing: { after: 60 },
-              children: [
-                label('📍 리뷰 순위 : ', true),
-                new TextRun({ text: `${r.reviewPosition}위 (랭킹순)`, font: 'Malgun Gothic', size: 22, bold: true, color: 'C00000' }),
-              ],
-            }),
-            new Paragraph({
-              spacing: { after: 60 },
-              children: [
-                label('📋 대응 정책 : ', true),
-                new TextRun({ text: r.refundPolicy || '', font: 'Malgun Gothic', size: 22, bold: true, color: '833C00' }),
-              ],
-            }),
-          ] : [
-            new Paragraph({
-              spacing: { after: 60 },
-              children: [label('리뷰순위 : ', true), new TextRun({ text: formatReviewPosition(r.reviewPosition), font: 'Malgun Gothic', size: 22, color: r.reviewPosition === -2 ? '888888' : '000000' })],
-            }),
-            ...(r.refundPolicy ? [new Paragraph({
-              spacing: { after: 60 },
-              children: [label('📋 대응 정책 : ', true), label(r.refundPolicy)],
-            })] : []),
-          ]),
-          new Paragraph({
-            spacing: { after: 60 },
-            children: [
-              label('리뷰 : ', true),
-              new TextRun({ text: `"${r.reviewText.replace(/\n/g, ' ')}"`, font: 'Malgun Gothic', size: 22, italics: true }),
-            ],
-          }),
-          ...(r.judgeLabel ? [new Paragraph({
-            spacing: { after: 60 },
-            children: [
-              new TextRun({ text: '🏷️ 판단 : ', bold: true, size: 22, font: 'Malgun Gothic' }),
-              new TextRun({ text: r.judgeLabel, bold: true, size: 22, font: 'Malgun Gothic', color: r.judgeLabel === '환불검토' ? 'C00000' : '2E7D32' }),
-            ],
-          })] : []),
-          ...(r.judgeReason ? [new Paragraph({
-            spacing: { after: 60 },
-            children: [
-              new TextRun({ text: '💭 판단 근거 : ', bold: true, size: 22, font: 'Malgun Gothic', color: 'C00000' }),
-              new TextRun({ text: `${r.judgeReason}${r.judgeConfidence != null ? ` (confidence ${r.judgeConfidence})` : ''}`, font: 'Malgun Gothic', size: 22, bold: true, color: 'C00000' }),
-            ],
-          })] : []),
-          ...(r.replyText ? [new Paragraph({
-            spacing: { after: 60 },
-            children: [
-              new TextRun({ text: '💬 답변 대응시 : ', bold: true, size: 22, font: 'Malgun Gothic', color: '7030A0' }),
-              new TextRun({ text: `"${r.replyText}"`, font: 'Malgun Gothic', size: 22, color: '7030A0' }),
-            ],
-          })] : []),
-          new Paragraph({ spacing: { after: 80 }, children: [] }),
-          new Paragraph({
-            spacing: { after: 160 },
-            children: [label('피드백 : ', true)],
-          }),
-        ]),
-        divider(),
-      ];
-    })(),
 
     // ── 실패 항목 ─────────────────────────────────────────
     ...(() => {
