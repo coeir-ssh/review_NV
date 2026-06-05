@@ -286,45 +286,42 @@ async function generateWordDoc(summary, dateStr) {
       ];
     })(),
 
-    // ── 답변 완료 (환불검토 다음)
-    new Paragraph({ spacing: { before: 200, after: 160 }, children: [label('■ 답변 완료 항목', true, 24)] }),
-    ...sortByRank(summary.results.filter(r => r.replyText && r.refundCheck !== '검토필요')).flatMap((r, i) => [
-      new Paragraph({ spacing: { before: 200, after: 80 }, shading: { fill: GRAY, type: ShadingType.CLEAR }, children: [label(`No.${i + 1}`, true, 22)] }),
-      new Paragraph({ spacing: { after: 60 }, children: [label('리뷰글번호 : ', true), label(r.reviewNo || '-')] }),
-      new Paragraph({ spacing: { after: 60 }, children: [label('등록자 : ', true), label(r.writer)] }),
-      new Paragraph({ spacing: { after: 60 }, children: [label('제품명 : ', true), label(getMasterProductName(r.productName))] }),
-      ...((opt => opt ? [new Paragraph({ spacing: { after: 60 }, children: [label('구매 옵션 : ', true), label(opt)] })] : [])(resolveDisplayOption(r))),
-      new Paragraph({ spacing: { after: 60 }, children: [label('별점 : ', true), label(`${stars(r.rating)} (${r.rating}점)`)] }),
-      new Paragraph({
-        spacing: { after: 60 },
-        children: [label('리뷰순위 : ', true), new TextRun({ text: formatReviewPosition(r.reviewPosition), font: 'Malgun Gothic', size: 22, bold: true, color: r.reviewPosition === -2 ? '888888' : '1F3864' })],
-      }),
-      new Paragraph({
-        spacing: { after: 60 },
-        children: [label('리뷰 : ', true), new TextRun({ text: `"${r.reviewText.replace(/\n/g, ' ')}"`, font: 'Malgun Gothic', size: 22, italics: true })],
-      }),
-      ...(r.judgeLabel ? [new Paragraph({
-        spacing: { after: 60 },
-        children: [
+    // ── 답변 항목 (판단체크 필요 / 일반 분리) ──
+    ...(() => {
+      const renderAnswered = (r, i, showReason) => [
+        new Paragraph({ spacing: { before: 200, after: 80 }, shading: { fill: GRAY, type: ShadingType.CLEAR }, children: [label(`No.${i + 1}`, true, 22)] }),
+        new Paragraph({ spacing: { after: 60 }, children: [label('리뷰글번호 : ', true), label(r.reviewNo || '-')] }),
+        new Paragraph({ spacing: { after: 60 }, children: [label('등록자 : ', true), label(r.writer)] }),
+        new Paragraph({ spacing: { after: 60 }, children: [label('제품명 : ', true), label(getMasterProductName(r.productName))] }),
+        ...((opt => opt ? [new Paragraph({ spacing: { after: 60 }, children: [label('구매 옵션 : ', true), label(opt)] })] : [])(resolveDisplayOption(r))),
+        new Paragraph({ spacing: { after: 60 }, children: [label('별점 : ', true), label(`${stars(r.rating)} (${r.rating}점)`)] }),
+        new Paragraph({ spacing: { after: 60 }, children: [label('리뷰순위 : ', true), new TextRun({ text: formatReviewPosition(r.reviewPosition), font: 'Malgun Gothic', size: 22, bold: true, color: r.reviewPosition === -2 ? '888888' : '1F3864' })] }),
+        new Paragraph({ spacing: { after: 60 }, children: [label('리뷰 : ', true), new TextRun({ text: `"${r.reviewText.replace(/\n/g, ' ')}"`, font: 'Malgun Gothic', size: 22, italics: true })] }),
+        ...(r.judgeLabel ? [new Paragraph({ spacing: { after: 60 }, children: [
           new TextRun({ text: '🏷️ 판단 : ', bold: true, size: 22, font: 'Malgun Gothic' }),
           new TextRun({ text: r.judgeLabel, bold: true, size: 22, font: 'Malgun Gothic', color: r.judgeLabel === '환불검토' ? 'C00000' : '2E7D32' }),
-        ],
-      })] : []),
-      // 판단 근거: 환불검토 + 답변이라도 confidence 낮으면(< 90) 표시
-      ...(shouldShowJudgeReason(r) ? [new Paragraph({
-        spacing: { after: 60 },
-        children: [
+        ] })] : []),
+        ...(showReason ? [new Paragraph({ spacing: { after: 60 }, children: [
           new TextRun({ text: '💭 판단 근거 : ', bold: true, size: 22, font: 'Malgun Gothic', color: 'C00000' }),
           new TextRun({ text: `${r.judgeReason}${r.judgeConfidence != null ? ` (confidence ${r.judgeConfidence})` : ''}`, font: 'Malgun Gothic', size: 22, bold: true, color: 'C00000' }),
-        ],
-      })] : []),
-      new Paragraph({
-        spacing: { after: 80 },
-        children: [label('답변 : ', true), new TextRun({ text: `"${r.replyText}"`, font: 'Malgun Gothic', size: 22, color: '1F497D' })],
-      }),
-      new Paragraph({ spacing: { after: 80 }, children: [] }),
-      new Paragraph({ spacing: { after: 160 }, children: [label('피드백 : ', true)] }),
-    ]),
+        ] })] : []),
+        new Paragraph({ spacing: { after: 80 }, children: [label('답변 : ', true), new TextRun({ text: `"${r.replyText}"`, font: 'Malgun Gothic', size: 22, color: '1F497D' })] }),
+        new Paragraph({ spacing: { after: 80 }, children: [] }),
+        new Paragraph({ spacing: { after: 160 }, children: [label('피드백 : ', true)] }),
+      ];
+      const answeredAll = summary.results.filter(r => r.replyText && r.refundCheck !== '검토필요');
+      const checkList   = sortByRank(answeredAll.filter(r => shouldShowJudgeReason(r)));
+      const normalList  = sortByRank(answeredAll.filter(r => !shouldShowJudgeReason(r)));
+      const out = [];
+      if (checkList.length > 0) {
+        out.push(new Paragraph({ spacing: { before: 200, after: 160 }, children: [label('⚠️ 답변 완료 - 판단체크 필요', true, 24)] }));
+        checkList.forEach((r, i) => out.push(...renderAnswered(r, i, true)));
+        out.push(divider());
+      }
+      out.push(new Paragraph({ spacing: { before: 200, after: 160 }, children: [label('■ 답변 완료 항목', true, 24)] }));
+      normalList.forEach((r, i) => out.push(...renderAnswered(r, i, false)));
+      return out;
+    })(),
     divider(),
 
     // ── 실패
@@ -450,8 +447,35 @@ async function sendSlack(summary) {
     });
   }
 
-  // 답변 완료 (환불검토 다음)
-  const repliedList = sortByRank(summary.results.filter(r => r.replyText && r.refundCheck !== '검토필요'));
+  // 답변 항목 (판단체크 필요 / 일반 분리)
+  const answeredAll = summary.results.filter(r => r.replyText && r.refundCheck !== '검토필요');
+  const checkList   = sortByRank(answeredAll.filter(r => shouldShowJudgeReason(r)));
+  const repliedList = sortByRank(answeredAll.filter(r => !shouldShowJudgeReason(r)));
+
+  // ② 답변 완료 - 판단체크 필요
+  if (checkList.length > 0) {
+    lines.push(`─────────────────────────────`);
+    lines.push(`⚠️ 답변 완료 - 판단체크 필요 (${checkList.length}건)`);
+    checkList.forEach((r, i) => {
+      lines.push(`─────────────────────────────`);
+      lines.push(`No.${i + 1}`);
+      lines.push(`리뷰글번호 : ${r.reviewNo || '-'}`);
+      lines.push(`등록자 : ${r.writer}`);
+      lines.push(`제품명 : ${getMasterProductName(r.productName)}`);
+      { const opt = resolveDisplayOption(r); if (opt) lines.push(`구매 옵션 : ${opt}`); }
+      lines.push(`별점 : ${stars(r.rating)} (${r.rating}점)`);
+      lines.push(`리뷰순위 : ${formatReviewPosition(r.reviewPosition)}`);
+      lines.push(`리뷰 : "${r.reviewText.replace(/\n/g, ' ')}"`);
+      if (r.judgeLabel) {
+        lines.push(`*🏷️ 판단 : ${r.judgeLabel}*`);
+      }
+      lines.push(`*🔴 판단 근거 : ${r.judgeReason}${r.judgeConfidence != null ? ` (confidence ${r.judgeConfidence})` : ''}*`);
+      lines.push(`답변 : "${r.replyText}"`);
+      lines.push(``);
+    });
+  }
+
+  // ③ 답변 완료 항목 (일반)
   if (repliedList.length > 0) {
     lines.push(`─────────────────────────────`);
     lines.push(`■ 답변 완료 항목 (${repliedList.length}건)`);
@@ -467,10 +491,6 @@ async function sendSlack(summary) {
       lines.push(`리뷰 : "${r.reviewText.replace(/\n/g, ' ')}"`);
       if (r.judgeLabel) {
         lines.push(`*🏷️ 판단 : ${r.judgeLabel}*`);
-      }
-      // 판단 근거: 환불검토 + 답변이라도 confidence 낮으면(< 90) 표시
-      if (shouldShowJudgeReason(r)) {
-        lines.push(`*🔴 판단 근거 : ${r.judgeReason}${r.judgeConfidence != null ? ` (confidence ${r.judgeConfidence})` : ''}*`);
       }
       lines.push(`답변 : "${r.replyText}"`);
       lines.push(``);
