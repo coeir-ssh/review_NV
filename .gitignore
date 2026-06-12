@@ -1,18 +1,33 @@
 # 비밀 정보 (절대 커밋 금지)
 config.js
 .seller_session.json
+.seller_session.meta.json
+.chrome_profile/
 
 # 실행 결과 / 캐시
 .review_summary.json
+.review_summary_cafe24.json
 .posting.lock
 holidays_cache.json
 logs/
 reply/
 
+# 자사몰(카페24) 토큰 / 캐시 / 상태 (절대 커밋 금지)
+.cafe24_token.json
+cafe24_products.json
+cafe24_seen.json
+
 # 에이전트 매개 워크플로우 중간 산출물
 pending_reviews.json
 replies.json
 posted_results.json
+verification_queue.json
+verification_result.json
+verification_summary.txt
+pending_reviews_cafe24.json
+replies_cafe24.json
+posted_results_cafe24.json
+screened_reviews_cafe24.json
 _tmp_*.js
 
 # Node

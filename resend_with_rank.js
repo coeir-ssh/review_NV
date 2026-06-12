@@ -247,6 +247,19 @@ async function generateWordDoc(summary, dateStr) {
     })] : []),
     divider(),
 
+    // ── 📚 전날 판단 검증 결과 (환불검토 앞)
+    ...(summary.verificationSummary ? [
+      new Paragraph({
+        spacing: { before: 100, after: 100 }, shading: { fill: 'E2EFDA', type: ShadingType.CLEAR },
+        children: [label('📚 전날 판단 검증 결과', true, 22)],
+      }),
+      ...summary.verificationSummary.split('\n').map(line => new Paragraph({
+        spacing: { after: 40 },
+        children: [new TextRun({ text: line, font: 'Malgun Gothic', size: 20, color: '375623' })],
+      })),
+      divider(),
+    ] : []),
+
     // ── 환불검토 (먼저 표시)
     ...(() => {
       const list = sortByRank(summary.results.filter(r => r.refundCheck === '검토필요'));
@@ -419,6 +432,14 @@ async function sendSlack(summary) {
     );
   }
   lines.push(``);
+
+  // 📚 전날 판단 검증 결과 (환불검토 앞)
+  if (summary.verificationSummary) {
+    lines.push(`─────────────────────────────`);
+    lines.push(`📚 전날 판단 검증 결과`);
+    summary.verificationSummary.split('\n').forEach(l => lines.push(l));
+    lines.push(``);
+  }
 
   // 환불검토 (먼저 표시)
   const refundList = sortByRank(summary.results.filter(r => r.refundCheck === '검토필요'));

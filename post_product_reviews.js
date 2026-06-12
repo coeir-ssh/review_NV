@@ -66,8 +66,14 @@ const CONFIG = {
   MAX_REVIEWS:  500,                 // 처리할 최대 리뷰 수 (사실상 무제한)
   MODEL:        'claude-sonnet-4-5', // Sonnet 모델
   sessionFile:  path.join(__dirname, '.seller_session.json'),
+  // 전용 크롬 프로필 — 한 번 로그인하면 이 프로필에 로그인 상태가 유지됨.
+  // 모든 스크립트(collect/post)가 같은 프로필을 재사용 → 일반 브라우저처럼 세션이 오래 감.
+  // (단명 쿠키 저장/복원 방식의 한계를 근본 해결)
+  userDataDir:  path.join(__dirname, '.chrome_profile'),
   reviewUrl:    'https://sell.smartstore.naver.com/#/review/search',
-  headless:     true,
+  // 기본 headless. 수동 로그인/추가 인증이 필요할 땐 HEADLESS=false 로 창을 띄움
+  // (PowerShell: $env:HEADLESS="false"; node collect_pending.js)
+  headless:     process.env.HEADLESS !== 'false',
   replyDelay:   3000,
 };
 
@@ -256,10 +262,55 @@ function getUsageSummary() {
 // ─────────────────────────────────────────────────────────
 // 세션
 // ─────────────────────────────────────────────────────────
-function saveSession(c) { fs.writeFileSync(CONFIG.sessionFile, JSON.stringify(c)); }
+// 전 도메인 쿠키 수집 — page.cookies()(현재 URL 도메인만)로는 로그인을 유지하는
+// .naver.com 의 NID 인증 쿠키가 누락되어 세션이 하루도 못 가 만료된다.
+// CDP Network.getAllCookies 로 브라우저의 모든 도메인 쿠키를 가져와야 세션이 정상 수명(1~2주) 유지됨.
+async function getAllCookies(page) {
+  const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('cdp_timeout')), ms))]);
+  try {
+    const client = await withTimeout(page.target().createCDPSession(), 8000);
+    const { cookies } = await withTimeout(client.send('Network.getAllCookies'), 8000);
+    await client.detach().catch(() => {});
+    if (Array.isArray(cookies) && cookies.length) return cookies;
+  } catch (e) {}
+  // CDP 실패 시 폴백: 주요 네이버 도메인을 명시해 최대한 수집
+  try {
+    return await page.cookies(
+      'https://sell.smartstore.naver.com', 'https://smartstore.naver.com',
+      'https://brand.naver.com', 'https://commerce.naver.com',
+      'https://accounts.commerce.naver.com', 'https://nid.naver.com', 'https://www.naver.com'
+    );
+  } catch (e) {}
+  return await page.cookies();
+}
+
+const SESSION_META_FILE = path.join(__dirname, '.seller_session.meta.json');
+// isFullLogin=true 일 때만 '마지막 수동/전체 로그인 시각' 기록 (passive 쿠키 갱신은 기록 안 함)
+// → 세션 수명(만료까지 남은 날) 추정의 기준. 만료 며칠 전 사전 알림에 사용.
+function saveSession(c, isFullLogin = false) {
+  fs.writeFileSync(CONFIG.sessionFile, JSON.stringify(c));
+  if (isFullLogin) {
+    try { fs.writeFileSync(SESSION_META_FILE, JSON.stringify({ fullLoginAt: new Date().toISOString() })); } catch(e) {}
+  }
+}
 function loadSession() {
   try { if (fs.existsSync(CONFIG.sessionFile)) return JSON.parse(fs.readFileSync(CONFIG.sessionFile)); }
   catch(e) {}
+  return null;
+}
+// 마지막 전체 로그인 이후 경과 일수 (메타 없으면 세션 파일 mtime 으로 추정, 그래도 없으면 null)
+function sessionAgeDays() {
+  try {
+    if (fs.existsSync(SESSION_META_FILE)) {
+      const m = JSON.parse(fs.readFileSync(SESSION_META_FILE, 'utf8'));
+      if (m.fullLoginAt) return (Date.now() - new Date(m.fullLoginAt).getTime()) / 86400000;
+    }
+  } catch(e) {}
+  try {
+    if (fs.existsSync(CONFIG.sessionFile)) {
+      return (Date.now() - fs.statSync(CONFIG.sessionFile).mtimeMs) / 86400000;
+    }
+  } catch(e) {}
   return null;
 }
 
@@ -285,6 +336,60 @@ async function isLoggedIn(page) {
   });
 }
 
+// ID/PW 자동 로그인 시도 (config.js 의 SELLER_ID/SELLER_PW 사용). 성공 여부 반환.
+// 셀러센터 홈(sell.smartstore.naver.com/home)에서 시작 → [로그인하기] 클릭 → 로그인 폼에서 ID/PW 입력.
+// 2차 인증이 없는 계정이면 사람 개입 없이 자동 로그인됨.
+async function tryAutoLogin(page) {
+  try {
+    // 1) 셀러센터 홈으로 이동
+    await page.goto('https://sell.smartstore.naver.com/home', { waitUntil: 'networkidle2', timeout: 30000 });
+    await sleep(1500);
+    if (await isLoggedIn(page)) return true; // 이미 로그인된 경우
+
+    // 2) [로그인하기] 링크/버튼 클릭 → accounts.commerce.naver.com/login 으로 이동
+    log('  [로그인하기] 클릭...');
+    const clicked = await page.evaluate(() => {
+      const els = Array.from(document.querySelectorAll('a, button'));
+      const el = els.find(e => (e.textContent || '').trim() === '로그인하기')
+              || els.find(e => /accounts\.commerce\.naver\.com\/login/.test(e.getAttribute('href') || ''));
+      if (el) { el.click(); return true; }
+      return false;
+    });
+    if (clicked) {
+      await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 }).catch(() => {});
+    } else {
+      // 폴백: 로그인 URL 직접 이동
+      await page.goto('https://accounts.commerce.naver.com/login?url=https%3A%2F%2Fsell.smartstore.naver.com%2F%23%2Flogin-callback', { waitUntil: 'networkidle2', timeout: 20000 }).catch(() => {});
+    }
+    await sleep(1500);
+
+    // 3) 로그인 폼에서 ID/PW 입력
+    await page.waitForSelector('input[type="password"]', { timeout: 8000 }).catch(() => {});
+    const idF = await page.$('input[placeholder="아이디 또는 이메일 주소"]')
+             || await page.$('input[name="id"]') || await page.$('input[type="text"]');
+    const pwF = await page.$('input[type="password"]');
+    if (!idF || !pwF) return false;
+    log('  ID/PW 입력 중...');
+    await idF.click({ clickCount: 3 }); await idF.type(cfg.SELLER_ID, { delay: 80 });
+    await sleep(300);
+    await pwF.click({ clickCount: 3 }); await pwF.type(cfg.SELLER_PW, { delay: 80 });
+    await sleep(300);
+    await page.evaluate(() => {
+      const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === '로그인')
+               || document.querySelector('button[type="submit"]');
+      if (btn) btn.click();
+    });
+    await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 }).catch(() => {});
+    await sleep(2000);
+    // 4) 셀러센터로 들어가 로그인 확정
+    await page.goto('https://sell.smartstore.naver.com/', { waitUntil: 'networkidle2', timeout: 30000 }).catch(() => {});
+    return await isLoggedIn(page);
+  } catch (e) {
+    log(`  [자동 로그인 오류] ${e.message}`);
+    return false;
+  }
+}
+
 async function loginToSellerCenter(page) {
   const saved = loadSession();
   if (saved) {
@@ -296,37 +401,34 @@ async function loginToSellerCenter(page) {
     try { fs.unlinkSync(CONFIG.sessionFile); } catch(e) {}
   }
 
-  await page.goto('https://accounts.commerce.naver.com/login', { waitUntil: 'networkidle2', timeout: 20000 });
-  await sleep(1500);
+  const isScheduled = process.argv.includes('--scheduled');
 
-  const idF = await page.$('input[placeholder="아이디 또는 이메일 주소"]');
-  const pwF = await page.$('input[type="password"]');
-  if (idF && pwF) {
-    log('  ID/PW 입력 중...');
-    await idF.click({ clickCount: 3 }); await idF.type(cfg.SELLER_ID, { delay: 80 });
-    await sleep(300);
-    await pwF.click({ clickCount: 3 }); await pwF.type(cfg.SELLER_PW, { delay: 80 });
-    await sleep(300);
-    await page.evaluate(() => {
-      const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === '로그인');
-      if (btn) btn.click();
-    });
-    await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 }).catch(() => {});
-    await sleep(2000);
-  }
-
-  if (!(await isLoggedIn(page))) {
-    // 무인 환경(오전 8시 자동 실행)에서 askQuestion()으로 블로킹하면 영구 멈춤
-    // → 에러 throw로 즉시 종료, main().catch()가 Slack 알림 + 락파일 정리 담당
-    if (process.argv.includes('--scheduled')) {
-      throw new Error('세션 만료: 수동 재로그인 필요. 터미널에서 한 번 직접 실행해서 세션을 갱신해 주세요.');
+  // ── 무인(자동 실행): ID/PW 자동 로그인 시도 (실패하면 throw → Slack 알림) ──
+  if (isScheduled) {
+    if (await tryAutoLogin(page)) {
+      saveSession(await getAllCookies(page), true);
+      log('  ✓ 자동 로그인 완료');
+      return;
     }
-    // 수동 실행 시에는 기존처럼 대기
-    log('  추가 인증이 필요합니다. 브라우저에서 인증 완료 후 Enter를 누르세요.');
-    await askQuestion('  인증 완료 후 Enter ▶ ');
-    await sleep(2000);
+    throw new Error('세션 만료 + 자동 로그인 실패: 터미널에서 $env:HEADLESS="false"; node collect_pending.js 로 한 번 직접 로그인해 세션을 갱신해 주세요.');
   }
-  saveSession(await page.cookies());
+
+  // ── 수동(headed): 처음부터 셀러센터 홈으로 이동 → 사용자가 [로그인하기]로 직접 로그인 → 자동 감지 ──
+  // (네이버가 봇 자동 로그인을 막으므로, 수동 실행에선 자동 로그인 시도를 생략하고 바로 홈으로)
+  log('  셀러센터 홈으로 이동합니다. 브라우저에서 [로그인하기]로 직접 로그인해 주세요.');
+  await page.goto('https://sell.smartstore.naver.com/home', { waitUntil: 'networkidle2', timeout: 30000 }).catch(() => {});
+  if (!(await isLoggedIn(page))) {
+    log('  → [로그인하기] 클릭 후 로그인을 완료하면 자동으로 진행됩니다 (최대 10분, Enter 불필요)...');
+    const deadline = Date.now() + 10 * 60 * 1000;
+    let ok = false;
+    while (Date.now() < deadline) {
+      await sleep(3000);
+      try { if (await isLoggedIn(page)) { ok = true; break; } } catch(e) {}
+    }
+    if (!ok) throw new Error('로그인 대기 시간 초과(10분): 브라우저에서 로그인을 완료하지 못했습니다. 다시 시도해 주세요.');
+    await sleep(1500);
+  }
+  saveSession(await getAllCookies(page), true); // 전 도메인 쿠키 저장 + 세션 갱신 시각 기록
   log('  ✓ 로그인 완료');
 }
 
@@ -478,7 +580,7 @@ async function ensureCoeirStore(page) {
   log(`  ✓ ${TARGET_STORE_NAME} 스토어로 전환 완료`);
 
   // 전환된 세션을 캐시에 저장 (다음 실행 때 바로 코에르로 들어가도록)
-  try { saveSession(await page.cookies()); } catch(e) {}
+  try { saveSession(await getAllCookies(page)); } catch(e) {}
 }
 
 // ─────────────────────────────────────────────────────────
@@ -1187,6 +1289,24 @@ async function sendSlackError(message) {
   });
 }
 
+// 경고/안내성 Slack 단문 (🚨 오류 프리픽스 없는 중립 메시지 — 사전 리마인드용)
+async function sendSlackText(text) {
+  const token     = cfg.SLACK_BOT_TOKEN;
+  const channelId = cfg.SLACK_CHANNEL_ID || cfg.SLACK_USER_ID || 'U08KNE04HKK';
+  if (!token) return;
+  const body = JSON.stringify({ channel: channelId, text });
+  return new Promise(resolve => {
+    const req = require('https').request(
+      { hostname: 'slack.com', path: '/api/chat.postMessage', method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json; charset=utf-8' } },
+      res => { res.resume(); resolve(); }
+    );
+    req.on('error', resolve);
+    req.write(body);
+    req.end();
+  });
+}
+
 // 워드 파일을 슬랙 채널에 업로드 (files.getUploadURLExternal flow)
 // 1) getUploadURLExternal 로 임시 업로드 URL 받음
 // 2) URL 에 파일 바이너리 POST
@@ -1280,9 +1400,12 @@ async function sendSlackDM(summary) {
     : '';
 
   // ── 헤더 ─────────────────────────────────────────
+  // channelLabel 설정 시(예: '자사몰(카페24)') 제목/요약에 채널 표기 (기본=네이버, 표기 없음)
+  const chTitle = summary.channelLabel ? `${summary.channelLabel} ` : '';
   const lines = [
-    `안녕하세요! 오늘(${dateStr}) 코에르 리뷰 자동 답변 작업 완료 보고드립니다 😊`,
+    `안녕하세요! 오늘(${dateStr}) 코에르 ${chTitle}리뷰 자동 답변 작업 완료 보고드립니다 😊`,
     `작업 요약`,
+    ...(summary.channelLabel ? [`• 채널: ${summary.channelLabel}`] : []),
     `• 조건: 1주일 작성 + 답글미등록`,
     `• 총 처리: ${summary.replied}개 완료 ✅  |  환불검토: ${summary.refund}개  |  실패: ${summary.failed}개`,
     `• 실행환경 : ${summary.executionEnv || '백그라운드 자동 (Anthropic API 직접 호출)'}`,
@@ -1291,6 +1414,14 @@ async function sendSlackDM(summary) {
     ...(usageLine ? [usageLine] : []),
     ``,
   ];
+
+  // ── 📚 전날 판단 검증 결과 (환불검토 섹션 앞) ──────
+  if (summary.verificationSummary) {
+    lines.push(`─────────────────────────────`);
+    lines.push(`📚 전날 판단 검증 결과`);
+    summary.verificationSummary.split('\n').forEach(l => lines.push(l));
+    lines.push(``);
+  }
 
   // ── 환불검토 항목 (먼저 표시) ─────────────────────
   const refundList = sortByRank(summary.results.filter(r => r.refundCheck === '검토필요'));
@@ -1303,7 +1434,7 @@ async function sendSlackDM(summary) {
       lines.push(`제품명 : ${getMasterProductName(r.productName)}`);
       { const opt = resolveDisplayOption(r); if (opt) lines.push(`구매 옵션 : ${opt}`); }
       lines.push(`별점 : ${stars(r.rating)} (${r.rating}점)`);
-      lines.push(`리뷰순위 : ${formatReviewPosition(r.reviewPosition)}`);
+      if (!summary.channelLabel) lines.push(`리뷰순위 : ${formatReviewPosition(r.reviewPosition)}`);
       lines.push(`📋 대응 정책 : ${r.refundPolicy || '미확인'}`);
       lines.push(`리뷰 : "${r.reviewText.replace(/\n/g, ' ')}"`);
       if (r.judgeLabel) {
@@ -1336,7 +1467,7 @@ async function sendSlackDM(summary) {
       lines.push(`제품명 : ${getMasterProductName(r.productName)}`);
       { const opt = resolveDisplayOption(r); if (opt) lines.push(`구매 옵션 : ${opt}`); }
       lines.push(`별점 : ${stars(r.rating)} (${r.rating}점)`);
-      lines.push(`리뷰순위 : ${formatReviewPosition(r.reviewPosition)}`);
+      if (!summary.channelLabel) lines.push(`리뷰순위 : ${formatReviewPosition(r.reviewPosition)}`);
       lines.push(`리뷰 : "${r.reviewText.replace(/\n/g, ' ')}"`);
       if (r.judgeLabel) {
         lines.push(`*🏷️ 판단 : ${r.judgeLabel}*`);
@@ -1359,7 +1490,7 @@ async function sendSlackDM(summary) {
       lines.push(`제품명 : ${getMasterProductName(r.productName)}`);
       { const opt = resolveDisplayOption(r); if (opt) lines.push(`구매 옵션 : ${opt}`); }
       lines.push(`별점 : ${stars(r.rating)} (${r.rating}점)`);
-      lines.push(`리뷰순위 : ${formatReviewPosition(r.reviewPosition)}`);
+      if (!summary.channelLabel) lines.push(`리뷰순위 : ${formatReviewPosition(r.reviewPosition)}`);
       lines.push(`리뷰 : "${r.reviewText.replace(/\n/g, ' ')}"`);
       if (r.judgeLabel) {
         lines.push(`*🏷️ 판단 : ${r.judgeLabel}*`);
@@ -1447,7 +1578,7 @@ async function generateWordDoc(summary) {
     new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { after: 80 },
-      children: [new TextRun({ text: '코에르 리뷰 자동 답변 보고서', bold: true, size: 32, font: 'Malgun Gothic', color: '1F3864' })],
+      children: [new TextRun({ text: `코에르 ${summary.channelLabel ? summary.channelLabel + ' ' : ''}리뷰 자동 답변 보고서`, bold: true, size: 32, font: 'Malgun Gothic', color: '1F3864' })],
     }),
     new Paragraph({
       alignment: AlignmentType.CENTER,
@@ -1461,6 +1592,10 @@ async function generateWordDoc(summary) {
       shading: { fill: 'D9E1F2', type: ShadingType.CLEAR },
       children: [label('작업 요약', true, 24)],
     }),
+    ...(summary.channelLabel ? [new Paragraph({
+      spacing: { after: 80 },
+      children: [label(`• 채널: ${summary.channelLabel}`)],
+    })] : []),
     new Paragraph({
       spacing: { after: 80 },
       children: [label(`• 조건: 1주일 작성 + 답글미등록`)],
@@ -1492,6 +1627,19 @@ async function generateWordDoc(summary) {
     })] : []),
 
     divider(),
+
+    // ── 📚 전날 판단 검증 결과 (환불검토 섹션 앞) ──────────
+    ...(summary.verificationSummary ? [
+      new Paragraph({
+        spacing: { before: 100, after: 100 }, shading: { fill: 'E2EFDA', type: ShadingType.CLEAR },
+        children: [label('📚 전날 판단 검증 결과', true, 22)],
+      }),
+      ...summary.verificationSummary.split('\n').map(line => new Paragraph({
+        spacing: { after: 40 },
+        children: [new TextRun({ text: line, font: 'Malgun Gothic', size: 20, color: '375623' })],
+      })),
+      divider(),
+    ] : []),
 
     // ── 환불검토 항목 (먼저 표시) ─────────────────────────
     ...(() => {
@@ -1675,7 +1823,7 @@ async function generateWordDoc(summary) {
 
   const now = new Date();
   const dateNum = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
-  const filename = `${dateNum}_reply.docx`;
+  const filename = `${dateNum}${summary.fileSuffix || ''}_reply.docx`;
   const filepath = path.join(replyDir, filename);
 
   const buffer = await Packer.toBuffer(doc);
@@ -2840,6 +2988,9 @@ module.exports = {
   sendSlackDM,
   uploadFileToSlack,
   sendSlackError,
+  sendSlackText,
+  // 세션 수명 점검 (사전 만료 알림용)
+  sessionAgeDays,
   // 지식 / 분류 (옵션 — 에이전트가 직접 추론할 때 참고용)
   getProductKnowledge,
   // 토큰 사용량 추적 (에이전트 매개 실행에선 미사용)

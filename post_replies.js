@@ -257,6 +257,48 @@ const outFile = outArg ? outArg.split('=')[1] : 'posted_results.json';
   const outPath = path.isAbsolute(outFile) ? outFile : path.join(__dirname, outFile);
   fs.writeFileSync(outPath, JSON.stringify(out, null, 2), 'utf8');
   log(`✅ 결과 저장: ${outPath}`);
+
+  // ── 검증 큐 적재 (다음 영업일에 verify_predictions.js 가 검증) ──
+  // 대상: ① 환불검토 분류 건  ② 답변 + 판단근거(confidence<90) 건
+  try {
+    const queuePath = path.join(__dirname, 'verification_queue.json');
+    let queue = [];
+    if (fs.existsSync(queuePath)) {
+      try { queue = JSON.parse(fs.readFileSync(queuePath, 'utf8')); } catch { queue = []; }
+      if (!Array.isArray(queue)) queue = [];
+    }
+    const processedDate = out.date || new Date().toISOString().slice(0, 10);
+    const CONF_THRESHOLD = 90; // shouldShowJudgeReason 과 동일 기준
+    const targets = results.filter(r =>
+      r.judgeLabel === '환불검토' ||
+      (r.judgeLabel === '답변' && r.judgeReason && r.judgeConfidence != null && r.judgeConfidence < CONF_THRESHOLD)
+    );
+    const existingNos = new Set(queue.map(q => String(q.reviewNo)));
+    let added = 0;
+    for (const r of targets) {
+      if (!r.reviewNo || existingNos.has(String(r.reviewNo))) continue;
+      queue.push({
+        reviewNo:        String(r.reviewNo),
+        productName:     r.productName || '',
+        writer:          r.writer || '',
+        rating:          r.rating,
+        reviewText:      r.reviewText || '',
+        reviewPosition:  r.reviewPosition,
+        judgeLabel:      r.judgeLabel,
+        judgeConfidence: r.judgeConfidence,
+        judgeReason:     r.judgeReason || '',
+        proposedReply:   r.replyText || '',
+        processedDate,
+        verified:        false,
+      });
+      added++;
+    }
+    // 오래된 검증완료분 정리 (verified=true 이면서 적재된 지 오래된 것)
+    fs.writeFileSync(queuePath, JSON.stringify(queue, null, 2), 'utf8');
+    log(`[검증 큐] +${added} 건 적재 (대기 ${queue.filter(q => !q.verified).length} / 총 ${queue.length})`);
+  } catch (e) {
+    log(`[검증 큐] 적재 오류(무시): ${e.message}`);
+  }
 })().catch(err => {
   console.error('\n[오류]', err.message);
   console.error(err.stack);

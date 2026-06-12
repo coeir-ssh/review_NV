@@ -33,6 +33,14 @@ const skipSlack = argv.includes('--no-slack');
   // posted_results.json 의 results 가 이미 호환 형식임 (writer/productName/judgeLabel/...)
   log(`[입력] ${inPath} (${summary.results?.length || 0} 건)`);
 
+  // ── 영업일 가드: 주말/공휴일 등 스킵 데이는 보고서·슬랙 모두 전송 안 함 ──
+  // pending_reviews.json 에서 skipped:true 가 posted_results.json 으로 전파되거나,
+  // 에이전트가 명시적으로 skipped 마커를 둔 경우 모두 처리.
+  if (summary.skipped === true) {
+    log(`[영업일 가드] skipped=true (${summary.skipReason || '사유 미상'}) → Word·Slack 전송 생략. 정상 종료.`);
+    process.exit(0);
+  }
+
   // ── 에이전트 매개 실행 디폴트 메타 주입 (값 없으면 채움) ──
   // 환경변수로 모델명 오버라이드 가능: COEIR_AI_MODEL
   if (!summary.executionEnv) summary.executionEnv = '윈도우 Claude Code 클라이언트 앱';
@@ -40,6 +48,29 @@ const skipSlack = argv.includes('--no-slack');
   if (!summary.cost)         summary.cost         = '₩0';
   // 에이전트 매개 모드에선 API 토큰/비용 추적이 없으므로 summary.usage 는 미설정.
   // 위 3개 디폴트 라인이 작업 요약에 표시된다.
+
+  // ── 전날 판단 검증 요약 주입 (환불검토 섹션 앞에 표시) ──
+  // 우선순위: 에이전트가 분석해 적은 verification_summary.txt > 자동 생성(verification_result.json)
+  if (!summary.verificationSummary) {
+    const txtPath = path.join(__dirname, 'verification_summary.txt');
+    const resPath = path.join(__dirname, 'verification_result.json');
+    if (fs.existsSync(txtPath)) {
+      const t = fs.readFileSync(txtPath, 'utf8').trim();
+      if (t) summary.verificationSummary = t;
+    } else if (fs.existsSync(resPath)) {
+      try {
+        const vr = JSON.parse(fs.readFileSync(resPath, 'utf8'));
+        if (vr.results && vr.results.length) {
+          const c = vr.counts || {};
+          const lines = [`적중 ${c.refundHit || 0} · 빗나감 ${(c.refundMiss||0)+(c.ansMiss||0)} · 답변정상 ${c.ansOk || 0}${c.unknown ? ` · 확인불가 ${c.unknown}` : ''}`];
+          vr.results.filter(r => r.verdict && r.verdict.startsWith('빗나감')).forEach(r => {
+            lines.push(`• [빗나감] ${r.reviewNo} ${(r.productName||'').slice(0,16)} — 내 판단 '${r.judgeLabel}' → 실제 '${r.actualStatus}'`);
+          });
+          summary.verificationSummary = lines.join('\n');
+        }
+      } catch {}
+    }
+  }
 
   // .review_summary.json 으로도 저장 (resend_with_rank.js 등과 호환)
   const stdSummaryPath = path.join(__dirname, '.review_summary.json');

@@ -15,7 +15,9 @@ Step 2. 에이전트(나) 가 pending_reviews.json 을 읽고 각 리뷰마다:
         - 검수 (감사 체크리스트 통과 여부)
         → replies.json 작성
 Step 3. node post_replies.js
-        → posted_results.json (실제 등록 결과)
+        → posted_results.json (실제 등록 결과) + verification_queue.json 적재
+Step 3.5 node verify_predictions.js
+        → verification_result.json (전날 판단 검증) → 에이전트가 분석·학습
 Step 4. node generate_report.js
         → reply/YYYYMMDD_reply.docx + Slack DM + 워드 파일 업로드
 ```
@@ -72,7 +74,7 @@ node collect_pending.js
 - `reviews[]`: `{ no, writer, reviewNo, productName, optionName, rating, date, reviewText, reviewPosition, productUrl, posPolicy, searchedCount, ... }`
 
 **Step 1 종료 후 분기:**
-- `skipped === true` → **Step 2~4 모두 생략**, Slack 에 "📅 오늘은 영업일이 아닙니다 ({skipReason}) — 자동 작업 스킵" 알림만 보내고 종료
+- `skipped === true` → **Step 2~4 모두 생략, Slack/Word 모두 전송하지 않음**. 그냥 조용히 종료 (사용자 요청)
 - `totalReviews === 0` → Step 2~4 생략, Slack 에 "오늘 답글미등록 리뷰 없음" 알림만
 - 그 외 → Step 2 로 진행
 
@@ -200,7 +202,50 @@ node post_replies.js
 ```
 
 `replies.json` 을 읽어 답변 항목만 셀러센터에 자동 등록. 환불검토는 보고서에만 포함.
-결과는 `posted_results.json`. (이 단계는 30분 이상 걸릴 수 있음 → `run_in_background: true` 권장)
+결과는 `posted_results.json`.
+
+🚨🚨 **헤드리스(`--print`) 모드 필수 규칙 — 절대 위반 금지**:
+이 routine 은 스케줄러에서 `claude.exe --print` 비대화 모드로 실행된다. 이 모드에서는
+**모든 `node` 명령(Step 1·3·4 포함)을 반드시 포그라운드(블로킹)로 실행**해야 한다.
+- ❌ **`run_in_background: true` 절대 사용 금지** — 백그라운드로 던지고 "알림 대기" 하면
+  claude.exe 가 대기 중 종료되고, 자식 프로세스(수집·등록)도 같이 죽어 Step 4 까지 못 간다.
+  (이것이 6/4 이후 Slack 리포트가 안 온 실제 원인)
+- ✅ `post_replies.js` 가 30분 이상 걸려도 **포그라운드로 끝까지 기다린다.**
+  Bash 도구 `timeout` 을 충분히 크게(예: 3,600,000ms = 1시간) 설정해 한 번에 완료시킬 것.
+- ✅ 각 단계는 이전 단계 프로세스가 **완전히 종료된 뒤** 다음 단계로 진행.
+
+---
+
+## Step 3.5. 전날 판단 검증 + 학습
+
+```bash
+node verify_predictions.js
+```
+
+전날(또는 마지막 미검증 영업일) 처리한 **환불검토 건**과 **판단근거 남긴 답변 건**이
+실제로 어떻게 됐는지 셀러센터에서 리뷰글번호로 조회해 검증한다.
+- `post_replies.js` 가 처리 시 `verification_queue.json` 에 검증 대상을 적재해 둠
+- `verify_predictions.js` 가 미검증분(verified:false)을 셀러센터 "리뷰글번호 복수검색"으로 조회
+- 전시상태 **블라인드**=환불됨 / **정상**=답변처리 로 판정 → `verification_result.json`
+- 포그라운드 실행 (Step 3 규칙과 동일, 백그라운드 금지)
+
+### 검증 결과 분석·학습 (에이전트가 직접 수행)
+`verification_result.json` 을 읽고:
+1. **환불검토 빗나감** (verdict='빗나감', 즉 블라인드 안 되고 정상 답변처리됨)
+   → 내가 너무 보수적으로 환불검토 분류한 것. 어떤 패턴(제품·리뷰 유형)에서 틀렸는지 분석.
+2. **답변 빗나감** (verdict='빗나감(환불됨)', 즉 답변으로 봤는데 실제 환불됨)
+   → 내가 환불검토로 올렸어야 할 건을 답변으로 본 것. 더 적극적으로 봤어야.
+3. 반복되는 오판 패턴은 `memory/feedback_reply_rules.md` 에 "## 검증 학습 노트" 섹션으로
+   누적 기록 (Step 0 풀 지식 덤프 시 함께 로드되어 다음 판단에 반영됨).
+4. 보고서/슬랙용 요약을 **`verification_summary.txt`** 로 작성 (없으면 generate_report 가
+   verification_result.json 으로 자동 요약 생성). 형식 예:
+   ```
+   적중 2 · 빗나감 1 · 답변정상 3
+   • [빗나감] 4992212415 테라조캐니스터 — 환불검토로 봤으나 정상(답변처리). 단순 마감 아쉬움은 답변이 맞았음
+   → 학습: 핸드메이드 형태 편차·뚜껑 헐거움 단독은 환불검토보다 답변+점검안내가 적절
+   ```
+
+검증 대상이 0건이면 이 단계는 조용히 건너뛴다.
 
 ---
 
