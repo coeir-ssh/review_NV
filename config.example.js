@@ -17,4 +17,15 @@ module.exports = {
   SLACK_USER_ID:     process.env.SLACK_USER_ID     || 'U........',
   SLACK_CHANNEL_ID:  process.env.SLACK_CHANNEL_ID  || 'C........',
   DATA_GO_KR_KEY:    process.env.DATA_GO_KR_KEY    || 'YOUR_DATA_GO_KR_KEY',
+
+  // 자사몰(카페24) Open API — https://developers.cafe24.com 앱 생성 후 발급
+  // scope: mall.read_community, mall.write_community, mall.read_product
+  CAFE24_MALL_ID:         process.env.CAFE24_MALL_ID         || 'YOUR_MALL_ID',
+  CAFE24_CLIENT_ID:       process.env.CAFE24_CLIENT_ID       || 'YOUR_CAFE24_CLIENT_ID',
+  CAFE24_CLIENT_SECRET:   process.env.CAFE24_CLIENT_SECRET   || 'YOUR_CAFE24_CLIENT_SECRET',
+  CAFE24_REDIRECT_URI:    process.env.CAFE24_REDIRECT_URI    || 'https://localhost',
+  CAFE24_REVIEW_BOARD_NO: process.env.CAFE24_REVIEW_BOARD_NO || '4',
+  CAFE24_API_VERSION:     process.env.CAFE24_API_VERSION     || '2026-03-01',
+  CAFE24_COMMENT_WRITER:   process.env.CAFE24_COMMENT_WRITER   || '코에르',      // 답글 작성자명
+  CAFE24_COMMENT_PASSWORD: process.env.CAFE24_COMMENT_PASSWORD || 'CHANGE_ME',   // 답글 수정/삭제용 비밀번호(필수)
 };

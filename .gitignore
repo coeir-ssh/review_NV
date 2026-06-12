@@ -37,3 +37,6 @@ npm-debug.log*
 # OS
 Thumbs.db
 .DS_Store
+
+# 일회성 답변 생성 스크립트 (날짜별 throwaway)
+_build_replies.js
