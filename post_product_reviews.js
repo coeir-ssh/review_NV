@@ -381,8 +381,9 @@ async function tryAutoLogin(page) {
     });
     await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 }).catch(() => {});
     await sleep(2000);
-    // 4) 셀러센터로 들어가 로그인 확정
-    await page.goto('https://sell.smartstore.naver.com/', { waitUntil: 'networkidle2', timeout: 30000 }).catch(() => {});
+    // 4) 셀러센터 대시보드로 로그인 확정 — 루트('/')는 공개 /home 으로 리다이렉트되어 오판하므로 대시보드 해시 라우트 사용
+    await page.goto('https://sell.smartstore.naver.com/#/home/dashboard', { waitUntil: 'networkidle2', timeout: 30000 }).catch(() => {});
+    await sleep(1500);
     return await isLoggedIn(page);
   } catch (e) {
     log(`  [자동 로그인 오류] ${e.message}`);
@@ -395,7 +396,9 @@ async function loginToSellerCenter(page) {
   if (saved) {
     log('  저장된 세션 확인 중...');
     await page.setCookie(...saved);
-    await page.goto('https://sell.smartstore.naver.com/', { waitUntil: 'networkidle2', timeout: 30000 });
+    // 루트('/')는 공개 /home 으로 리다이렉트되어 로그인 상태를 오판함 → 대시보드 해시 라우트로 확인
+    await page.goto('https://sell.smartstore.naver.com/#/home/dashboard', { waitUntil: 'networkidle2', timeout: 30000 });
+    await sleep(1500);
     if (await isLoggedIn(page)) { log('  ✓ 세션 로그인 성공'); return; }
     log('  세션 만료 → 재로그인');
     try { fs.unlinkSync(CONFIG.sessionFile); } catch(e) {}
@@ -406,7 +409,7 @@ async function loginToSellerCenter(page) {
   // ── 무인(자동 실행): ID/PW 자동 로그인 시도 (실패하면 throw → Slack 알림) ──
   if (isScheduled) {
     if (await tryAutoLogin(page)) {
-      saveSession(await getAllCookies(page), true);
+      saveSession(await page.cookies(), true);
       log('  ✓ 자동 로그인 완료');
       return;
     }
@@ -428,7 +431,7 @@ async function loginToSellerCenter(page) {
     if (!ok) throw new Error('로그인 대기 시간 초과(10분): 브라우저에서 로그인을 완료하지 못했습니다. 다시 시도해 주세요.');
     await sleep(1500);
   }
-  saveSession(await getAllCookies(page), true); // 전 도메인 쿠키 저장 + 세션 갱신 시각 기록
+  saveSession(await page.cookies(), true); // 세션 갱신 시각 기록 (2개월 검증된 page.cookies() 방식)
   log('  ✓ 로그인 완료');
 }
 
@@ -580,7 +583,7 @@ async function ensureCoeirStore(page) {
   log(`  ✓ ${TARGET_STORE_NAME} 스토어로 전환 완료`);
 
   // 전환된 세션을 캐시에 저장 (다음 실행 때 바로 코에르로 들어가도록)
-  try { saveSession(await getAllCookies(page)); } catch(e) {}
+  try { saveSession(await page.cookies()); } catch(e) {}
 }
 
 // ─────────────────────────────────────────────────────────
@@ -2449,15 +2452,18 @@ async function main() {
   fs.writeFileSync(lockFile, String(process.pid));
 
   const browser = await puppeteer.launch({
-    headless:        CONFIG.headless,
-    protocolTimeout: 120000,
-    args:            ['--no-sandbox', '--disable-setuid-sandbox', '--lang=ko-KR,ko',
-                      '--window-size=1600,900'],
+    headless:          CONFIG.headless,
+    protocolTimeout:   120000,
+    ignoreDefaultArgs: ['--enable-automation'],   // "자동화 도구" 배너/신호 제거
+    args:              ['--no-sandbox', '--disable-setuid-sandbox', '--lang=ko-KR,ko',
+                        '--window-size=1600,900',
+                        '--disable-blink-features=AutomationControlled'], // navigator.webdriver 숨김
     defaultViewport: { width: 1600, height: 900 },
   });
 
   const page = await browser.newPage();
   await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36');
+  await page.evaluateOnNewDocument(() => { Object.defineProperty(navigator, 'webdriver', { get: () => undefined }); });
   page.on('dialog', async d => { log(`  [알림] ${d.message()}`); await d.accept(); });
 
   let successCount = 0;

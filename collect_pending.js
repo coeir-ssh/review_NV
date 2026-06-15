@@ -66,13 +66,16 @@ const outFile = outArg ? outArg.split('=')[1] : 'pending_reviews.json';
   }
 
   const browser = await puppeteer.launch({
-    headless:        CONFIG.headless,
-    protocolTimeout: 120000,
-    args:            ['--no-sandbox', '--disable-setuid-sandbox', '--lang=ko-KR,ko', '--window-size=1600,900'],
+    headless:          CONFIG.headless,
+    protocolTimeout:   120000,
+    ignoreDefaultArgs: ['--enable-automation'],
+    args:              ['--no-sandbox', '--disable-setuid-sandbox', '--lang=ko-KR,ko', '--window-size=1600,900',
+                        '--disable-blink-features=AutomationControlled'],
     defaultViewport: { width: 1600, height: 900 },
   });
   const page = await browser.newPage();
   await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36');
+  await page.evaluateOnNewDocument(() => { Object.defineProperty(navigator, 'webdriver', { get: () => undefined }); });
   page.on('dialog', async d => { log(`  [알림] ${d.message()}`); await d.accept(); });
 
   const collected = [];

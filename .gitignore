@@ -40,3 +40,6 @@ Thumbs.db
 
 # 일회성 답변 생성 스크립트 (날짜별 throwaway)
 _build_replies.js
+
+# 로그인 디버그 일회성 도구
+debug_login.js

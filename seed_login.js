@@ -28,7 +28,6 @@ const { CONFIG, loginToSellerCenter } = require('./post_product_reviews');
   }
   const browser = await puppeteer.launch({
     headless:        false,
-    userDataDir:     CONFIG.userDataDir,
     protocolTimeout: 120000,
     args:            ['--no-sandbox', '--disable-setuid-sandbox', '--lang=ko-KR,ko', '--window-size=1600,900'],
     defaultViewport: { width: 1600, height: 900 },
