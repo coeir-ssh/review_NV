@@ -62,9 +62,24 @@ const skipSlack = argv.includes('--no-slack');
         const vr = JSON.parse(fs.readFileSync(resPath, 'utf8'));
         if (vr.results && vr.results.length) {
           const c = vr.counts || {};
-          const lines = [`적중 ${c.refundHit || 0} · 빗나감 ${(c.refundMiss||0)+(c.ansMiss||0)} · 답변정상 ${c.ansOk || 0}${c.unknown ? ` · 확인불가 ${c.unknown}` : ''}`];
-          vr.results.filter(r => r.verdict && r.verdict.startsWith('빗나감')).forEach(r => {
-            lines.push(`• [빗나감] ${r.reviewNo} ${(r.productName||'').slice(0,16)} — 내 판단 '${r.judgeLabel}' → 실제 '${r.actualStatus}'`);
+          const short = s => (s || '').replace(/^코에르\s*/, '').slice(0, 18);
+          const lines = [
+            `(전 영업일 처리분이 실제로 어떻게 됐는지 셀러센터에서 확인한 결과)`,
+            `· 환불검토 적중 ${c.refundHit || 0}건 (실제 블라인드 처리됨)`,
+            `· 환불검토 빗나감 ${c.refundMiss || 0}건 (답변으로 처리됨 → 보수적 판단)`,
+            `· 답변 정상등록 ${c.ansOk || 0}건 (답변으로 본 건이 실제 답글 정상 등록)`,
+            ...((c.ansMiss || 0) ? [`· 답변 빗나감 ${c.ansMiss}건 (답변으로 봤으나 실제 환불·블라인드)`] : []),
+            ...((c.unknown || 0) ? [`· 확인불가 ${c.unknown}건`] : []),
+          ];
+          // 환불검토 건은 적중/빗나감 모두 구체적으로 (가장 중요한 학습 대상)
+          const refunds = vr.results.filter(r => r.judgeLabel === '환불검토');
+          refunds.forEach(r => {
+            const mark = r.verdict === '적중' ? '✅ 적중' : r.verdict === '빗나감' ? '❌ 빗나감' : `· ${r.verdict}`;
+            lines.push(`[환불검토 ${mark}] ${r.reviewNo} ${short(r.productName)} — 실제 전시상태 '${r.actualStatus}'`);
+          });
+          // 답변 건은 빗나간 것만 (정상은 카운트로 충분)
+          vr.results.filter(r => r.judgeLabel === '답변' && (r.verdict || '').startsWith('빗나감')).forEach(r => {
+            lines.push(`[답변 ❌ 빗나감] ${r.reviewNo} ${short(r.productName)} — 실제 '${r.actualStatus}' (환불됐어야)`);
           });
           summary.verificationSummary = lines.join('\n');
         }
