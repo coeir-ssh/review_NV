@@ -192,39 +192,68 @@ const RESULT_PATH = path.join(__dirname, 'verification_result.json');
     });
     log(`[진단] 헤더 col-id: ${JSON.stringify(headerDump)}`);
 
-    // ── 결과 행 수집 (스크롤하며) ──
-    log('[수집] 검색 결과 전시상태/답글여부 수집...');
-    const seen = new Set();
-    let stale = 0;
-    while (true) {
-      const rows = await page.evaluate(() => {
-        const out = [];
-        document.querySelectorAll('.ag-center-cols-container .ag-row').forEach(row => {
+    // ── 결과 행 수집 (세로+가로 스크롤하며 모든 컬럼 누적) ──
+    // AG Grid 는 가로도 가상화 → 전시상태(contentsStatusType)·답글여부(hasComment) 컬럼이
+    // 화면 오른쪽 밖이면 DOM 에 없음. 가로로도 스크롤하며 row-index 별 셀을 누적해야 함.
+    log('[수집] 검색 결과 전시상태/답글여부 수집 (세로+가로 스크롤)...');
+    // rowAccum: rowIndex → { colId: text, ... } (가로 스크롤 단계마다 누적 병합)
+    const rowAccum = {};   // rowIndex -> cellByColId
+    const headerAccum = {}; // colId -> label (가로 스크롤로 추가 발견되는 헤더 누적)
+
+    // 한 번의 DOM 스냅샷에서 보이는 셀/헤더를 누적
+    const harvest = async () => {
+      const snap = await page.evaluate(() => {
+        const heads = {};
+        document.querySelectorAll('.ag-header-cell').forEach(h => {
+          const k = h.getAttribute('col-id') || '';
+          if (k) heads[k] = (h.innerText || '').trim().split('\n')[0];
+        });
+        const rows = [];
+        // center + pinned-left + pinned-right 모두
+        document.querySelectorAll('.ag-row[row-index]').forEach(row => {
+          const ri = row.getAttribute('row-index');
           const cells = {};
           row.querySelectorAll('.ag-cell').forEach(c => {
             const cid = c.getAttribute('col-id') || '';
             if (cid) cells[cid] = (c.innerText || '').trim();
           });
-          // id(리뷰글번호) / contentsStatusType(전시상태) / hasComment(답글여부) / modifyDate
-          const texts = Array.from(row.querySelectorAll('.ag-cell')).map(c => (c.innerText||'').trim());
-          out.push({
-            id:        cells.id || texts.find(t => /^\d{8,12}$/.test(t)) || '',
-            status:    cells.contentsStatusType || '',
-            hasComment:cells.hasComment || '',
-            modifyDate:cells.modifyDate || '',
-            allTexts:  texts,
-          });
+          rows.push({ ri, cells });
         });
-        return out;
+        return { heads, rows };
       });
-      let added = 0;
-      for (const r of rows) {
-        if (!r.id || seen.has(r.id)) continue;
-        seen.add(r.id);
-        statusByNo[r.id] = r;
-        added++;
+      Object.assign(headerAccum, snap.heads);
+      for (const { ri, cells } of snap.rows) {
+        if (!rowAccum[ri]) rowAccum[ri] = {};
+        Object.assign(rowAccum[ri], cells);
       }
-      if (added > 0) { log(`  [수집] +${added} (총 ${Object.keys(statusByNo).length})`); stale = 0; }
+    };
+
+    // 가로 스크롤: 한 세로 위치에서 viewport 를 좌→우 끝까지 훑으며 harvest
+    const sweepHorizontal = async () => {
+      await page.evaluate(() => { const vp = document.querySelector('.ag-body-viewport'); if (vp) vp.scrollLeft = 0; });
+      await sleep(250);
+      await harvest();
+      for (let i = 0; i < 12; i++) {
+        const moved = await page.evaluate(() => {
+          const vp = document.querySelector('.ag-body-viewport');
+          if (!vp) return false;
+          const before = vp.scrollLeft;
+          vp.scrollLeft = before + 600;
+          return vp.scrollLeft !== before;
+        });
+        await sleep(250);
+        await harvest();
+        if (!moved) break;
+      }
+      await page.evaluate(() => { const vp = document.querySelector('.ag-body-viewport'); if (vp) vp.scrollLeft = 0; });
+    };
+
+    let stale = 0;
+    let prevRowCount = 0;
+    while (true) {
+      await sweepHorizontal();
+      const rowCount = Object.keys(rowAccum).length;
+      if (rowCount > prevRowCount) { log(`  [수집] 행 ${rowCount} (누적)`); prevRowCount = rowCount; stale = 0; }
       else stale++;
       const moved = await page.evaluate(() => {
         const vp = document.querySelector('.ag-body-viewport');
@@ -233,9 +262,26 @@ const RESULT_PATH = path.join(__dirname, 'verification_result.json');
         vp.scrollTop = before + 400;
         return vp.scrollTop !== before;
       });
-      await sleep(500);
+      await sleep(400);
       if (!moved && stale >= 3) break;
     }
+    log(`[진단] 누적 헤더 col-id: ${JSON.stringify(headerAccum)}`);
+
+    // rowAccum → statusByNo (id 기준)
+    for (const ri of Object.keys(rowAccum)) {
+      const cells = rowAccum[ri];
+      const texts = Object.values(cells);
+      const id = cells.id || texts.find(t => /^\d{8,12}$/.test(t)) || '';
+      if (!id) continue;
+      statusByNo[id] = {
+        id,
+        status:     cells.contentsStatusType || cells.displayStatus || cells.statusType || '',
+        hasComment: cells.hasComment || cells.commentYn || cells.hasReply || '',
+        modifyDate: cells.modifyDate || '',
+        allTexts:   texts,
+      };
+    }
+    log(`[수집] 완료 — 총 ${Object.keys(statusByNo).length} 행`);
 
   } finally {
     await browser.close();
@@ -255,10 +301,15 @@ const RESULT_PATH = path.join(__dirname, 'verification_result.json');
       actualStatus = '미발견';
       hasReply = '';
     } else {
-      actualStatus = found.status || (isBlind(found.allTexts.join(' ')) ? '블라인드' : isNormal(found.allTexts.join(' ')) ? '정상' : '?');
+      const allTxt = found.allTexts.join(' ');
+      const blind  = isBlind(found.status) || isBlind(allTxt);
+      const normal = isNormal(found.status) || isNormal(allTxt);
+      actualStatus = found.status || (blind ? '블라인드' : normal ? '정상' : '?');
       hasReply = found.hasComment || '';
-      const blind = isBlind(actualStatus) || isBlind(found.allTexts.join(' '));
-      if (q.judgeLabel === '환불검토') {
+      if (actualStatus === '?' || (!blind && !normal)) {
+        // 전시상태를 읽지 못함 → 빗나감으로 단정하지 말고 확인불가 처리 (학습 오염 방지)
+        verdict = '확인불가(전시상태 못읽음)';
+      } else if (q.judgeLabel === '환불검토') {
         verdict = blind ? '적중' : '빗나감';     // 환불검토인데 블라인드면 적중
       } else { // 답변 + 판단근거
         verdict = blind ? '빗나감(환불됨)' : '정상(답변처리)';
@@ -289,7 +340,7 @@ const RESULT_PATH = path.join(__dirname, 'verification_result.json');
   const refundMiss = results.filter(r => r.judgeLabel === '환불검토' && r.verdict === '빗나감').length;
   const ansOk      = results.filter(r => r.judgeLabel === '답변' && r.verdict === '정상(답변처리)').length;
   const ansMiss    = results.filter(r => r.judgeLabel === '답변' && r.verdict.startsWith('빗나감')).length;
-  const unknown    = results.filter(r => r.verdict === '확인불가').length;
+  const unknown    = results.filter(r => r.verdict.startsWith('확인불가')).length;
 
   const out = {
     verifiedAt: new Date().toISOString(),
