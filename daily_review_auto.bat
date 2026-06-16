@@ -30,6 +30,9 @@ REM -- Step 0.5: knowledge dump for agent --
 echo [%date% %time%] knowledge dump >> "%LOG%"
 node dump_knowledge.js > knowledge_dump.txt 2>> "%LOG%"
 
+REM -- 에이전트 실행 전 이전 replies.json 제거 (에이전트 실패 시 구파일로 등록되는 것 방지) --
+if exist replies.json del /f replies.json
+
 REM -- Step 2: agent writes replies.json (no node exec) --
 echo [%date% %time%] Step2 agent judge >> "%LOG%"
 type daily_judge_prompt.txt | "%CLAUDE%" --print --add-dir "%DIR%" --dangerously-skip-permissions --max-turns 120 >> "%LOG%" 2>&1

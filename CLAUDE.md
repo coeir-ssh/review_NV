@@ -11,7 +11,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 실행 명령어
 
 ```bash
-# 메인 자동화 스크립트 — 오늘의 답글미등록 리뷰에 자동 답변
+# ★ 현재 메인 = 데일리 자동화 오케스트레이터 (스케줄 작업이 이걸 실행)
+#   .bat 이 node 단계를 직접(포그라운드) 실행하고, 에이전트는 "판단·답변"만 담당.
+#   순서: 수집 → (지식덤프) → 에이전트 판단(replies.json) → 등록 → 검증 → 보고서 → 워치독
+daily_review_auto.bat
+#   세부 스크립트(개별 실행/디버그용):
+node collect_pending.js [--scheduled]   # 답글미등록 수집 → pending_reviews.json (--scheduled=영업일 가드)
+node dump_knowledge.js > knowledge_dump.txt   # 제품지식 덤프(에이전트가 읽음)
+node post_replies.js                    # replies.json 의 답변 등록 → posted_results.json
+node verify_predictions.js              # 전날 판단 사후 검증 → verification_result.json
+node generate_report.js                 # Word + Slack 발송 (posted_results.json 기반)
+node post_run_check.js                  # 워치독: 미완주/세션만료 시 Slack 알림 + 세션 사전 경고
+
+# 세션 만료 시 수동 로그인 1회 (보이는 브라우저) — 평소엔 자동 로그인이라 거의 불필요
+$env:HEADLESS="false"; node seed_login.js
+
+# 레거시 메인 (구 직접 API 방식 — 현재 스케줄에서 미사용, 참조용)
 node post_product_reviews.js
 
 # 부가 스크립트
@@ -40,7 +55,19 @@ node alert_bad_reviews_cafe24.js          # 나쁜 리뷰 슬랙 알림 + cafe24
 node -c post_product_reviews.js
 ```
 
-최초 실행 시 headed 브라우저에서 수동 로그인 요청 → 쿠키가 `.seller_session.json`에 저장되어 이후 자동 로그인.
+## 로그인 / 세션 (중요 — 과거 반복 장애 지점)
+
+- **자동 로그인**: `tryAutoLogin()`(post_product_reviews.js)이 셀러센터 홈 → [로그인하기] → `config.js`의 ID/PW 입력으로 로그인. **headless 에서도 사람 개입 없이 동작.**
+- **봇 감지 우회 필수**: 모든 puppeteer launch 에 `--disable-blink-features=AutomationControlled` + `ignoreDefaultArgs:['--enable-automation']`, 페이지에 `navigator.webdriver` 숨김. 이게 없으면 네이버가 로그인을 막음.
+- **로그인 확인은 반드시 대시보드 주소(`#/home/dashboard`)로**. 루트(`/`)는 네이버가 공개 `/home`(로그아웃 화면)으로 리다이렉트해서 "세션 만료"로 오판함 (며칠간 장애의 실제 원인이었음).
+- **세션 저장**: `saveSession(await page.cookies())` — 2개월 검증된 방식. ⚠️ `getAllCookies`(CDP 전 도메인)·`userDataDir`(전용 프로필)은 시도했다가 **오히려 복원이 깨져서 제거**함. 네이버 세션 쿠키는 단명(~1일)이라 매일 자동 로그인으로 갱신하는 게 정상.
+- 세션 만료로 자동 로그인까지 실패하면(드묾): `$env:HEADLESS="false"; node seed_login.js` 로 1회 수동 로그인.
+
+## 실행 구조 (왜 .bat 오케스트레이터인가)
+
+- **~5/19**: `node post_product_reviews.js` 직접 실행(단일 포그라운드, API 유료). 2개월 안정.
+- **5/20~6/16**: "에이전트 매개"로 전환(claude --print 가 node 실행, 구독 무비용). 그러나 **에이전트가 node 를 백그라운드로 던지고 대기 → --print 세션 종료 시 프로세스 고아·멈춤**으로 자동 실행만 반복 실패(수동은 포그라운드라 정상).
+- **6/16~**: `daily_review_auto.bat` 가 node 단계를 **직접(포그라운드)** 실행, 에이전트(`daily_judge_prompt.txt`)는 **판단·답변(replies.json)만** 작성. 직접 실행의 안정성 + 에이전트 무비용 판단을 결합. **에이전트가 node 를 직접 실행하지 않게 하는 것이 핵심.**
 
 ## 민감 정보 (`config.js`)
 
