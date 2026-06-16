@@ -43,3 +43,6 @@ _build_replies.js
 
 # 로그인 디버그 일회성 도구
 debug_login.js
+
+# 에이전트용 지식 덤프 (생성물)
+knowledge_dump.txt
