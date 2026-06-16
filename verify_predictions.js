@@ -229,23 +229,25 @@ const RESULT_PATH = path.join(__dirname, 'verification_result.json');
     };
 
     // 가로 스크롤: 한 세로 위치에서 viewport 를 좌→우 끝까지 훑으며 harvest
+    // ⚠️ AG Grid 가로 스크롤 컨테이너는 .ag-center-cols-viewport (.ag-body-viewport 아님 — 그건 세로용)
+    const HSCROLL = '.ag-center-cols-viewport';
     const sweepHorizontal = async () => {
-      await page.evaluate(() => { const vp = document.querySelector('.ag-body-viewport'); if (vp) vp.scrollLeft = 0; });
+      await page.evaluate((sel) => { const vp = document.querySelector(sel); if (vp) vp.scrollLeft = 0; }, HSCROLL);
       await sleep(250);
       await harvest();
-      for (let i = 0; i < 12; i++) {
-        const moved = await page.evaluate(() => {
-          const vp = document.querySelector('.ag-body-viewport');
+      for (let i = 0; i < 20; i++) {
+        const moved = await page.evaluate((sel) => {
+          const vp = document.querySelector(sel);
           if (!vp) return false;
           const before = vp.scrollLeft;
-          vp.scrollLeft = before + 600;
+          vp.scrollLeft = before + 500;
           return vp.scrollLeft !== before;
-        });
+        }, HSCROLL);
         await sleep(250);
         await harvest();
         if (!moved) break;
       }
-      await page.evaluate(() => { const vp = document.querySelector('.ag-body-viewport'); if (vp) vp.scrollLeft = 0; });
+      await page.evaluate((sel) => { const vp = document.querySelector(sel); if (vp) vp.scrollLeft = 0; }, HSCROLL);
     };
 
     let stale = 0;
