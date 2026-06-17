@@ -73,7 +73,7 @@ function readJsonSafe(file) {
       `데일리 리뷰 루틴 실패 (${ymd})\n` +
       `• 증상: 오늘자 pending_reviews.json 이 없거나 갱신 안 됨 (Step 1 수집 실패 추정)\n` +
       `• 조치: 셀러센터 로그인/스토어 전환/그리드 렌더 확인 필요\n` +
-      `• 로그: logs\\agent_run_${ymd}_*.log`
+      `• 로그: logs\\auto_${ymd}.log`
     );
     console.log('[워치독] 실패 알림 전송: 수집 미완료');
     process.exit(0);
@@ -105,7 +105,7 @@ function readJsonSafe(file) {
       `• 수집: ${pending.totalReviews}건 정상\n` +
       `• 누락: ${miss.join(' / ')}\n` +
       `• 추정 원인: Step 3(등록) 또는 Step 4(보고서) 미실행 — 에이전트가 중간 종료됐을 가능성\n` +
-      `• 로그: logs\\agent_run_${ymd}_*.log`
+      `• 로그: logs\\auto_${ymd}.log`
     );
     console.log('[워치독] 실패 알림 전송: 등록/보고서 미완료');
     process.exit(0);

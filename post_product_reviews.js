@@ -1277,7 +1277,7 @@ ${productKnowledge ? `[이 제품 관련 지식]\n${productKnowledge}\n` : ''}
 // 오류 발생 시 Slack 단문 알림 (catch 핸들러용)
 async function sendSlackError(message) {
   const token     = cfg.SLACK_BOT_TOKEN;
-  const channelId = cfg.SLACK_CHANNEL_ID || cfg.SLACK_USER_ID || 'U08KNE04HKK';
+  const channelId = cfg.SLACK_USER_ID || cfg.SLACK_CHANNEL_ID || 'U08KNE04HKK'; // 실패·경고는 개인 DM 우선
   if (!token) return;
   const body = JSON.stringify({ channel: channelId, text: `🚨 *코에르 리뷰 자동화 오류*\n${message}` });
   return new Promise(resolve => {
@@ -1295,7 +1295,7 @@ async function sendSlackError(message) {
 // 경고/안내성 Slack 단문 (🚨 오류 프리픽스 없는 중립 메시지 — 사전 리마인드용)
 async function sendSlackText(text) {
   const token     = cfg.SLACK_BOT_TOKEN;
-  const channelId = cfg.SLACK_CHANNEL_ID || cfg.SLACK_USER_ID || 'U08KNE04HKK';
+  const channelId = cfg.SLACK_USER_ID || cfg.SLACK_CHANNEL_ID || 'U08KNE04HKK'; // 실패·경고는 개인 DM 우선
   if (!token) return;
   const body = JSON.stringify({ channel: channelId, text });
   return new Promise(resolve => {
