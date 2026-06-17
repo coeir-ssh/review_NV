@@ -69,6 +69,12 @@ node -c post_product_reviews.js
 - **5/20~6/16**: "에이전트 매개"로 전환(claude --print 가 node 실행, 구독 무비용). 그러나 **에이전트가 node 를 백그라운드로 던지고 대기 → --print 세션 종료 시 프로세스 고아·멈춤**으로 자동 실행만 반복 실패(수동은 포그라운드라 정상).
 - **6/16~**: `daily_review_auto.bat` 가 node 단계를 **직접(포그라운드)** 실행, 에이전트(`daily_judge_prompt.txt`)는 **판단·답변(replies.json)만** 작성. 직접 실행의 안정성 + 에이전트 무비용 판단을 결합. **에이전트가 node 를 직접 실행하지 않게 하는 것이 핵심.**
 
+### .bat / 스케줄러 함정 (6/17 장애로 확정 — 반드시 지킬 것)
+- 🚨 **.bat 안에서 `chcp 65001` 금지**. chcp 로 코드페이지를 바꾸면 cmd 가 .bat 파일 읽는 바이트 위치를 잃어 **이후 라인이 단어 중간에서 잘려 파싱**됨(스케줄러=CP949 환경에서 터짐, 수동 실행=이미 UTF-8이라 무증상). → `daily_review_auto.bat` 는 **ASCII 전용 + chcp 없음**. (로그의 한글이 깨져 보여도 JSON·Slack 은 UTF-8 이라 기능 무관)
+- **.bat 줄바꿈은 CRLF**. (Write 도구는 LF 로 저장하므로 저장 후 CRLF 변환 필요)
+- **스케줄러 액션은 ASCII 경로로**: 한글 경로(`코에르\클로드`)를 PowerShell `Set-ScheduledTask` 로 넣으면 작업 XML 인코딩이 깨져 0xFF. → ASCII junction 사용: `C:\coeir_review` → 프로젝트 폴더 (`New-Item -ItemType Junction`). 스케줄 액션 = `cmd /c "C:\coeir_review\daily_review_auto.bat"`.
+- **스케줄 작업**: `코에르_리뷰_에이전트매개` 매일 07:00, WakeToRun=True. + 별도 `코에르_리뷰_워치독` 08:30 (2차 안전망).
+
 ## 민감 정보 (`config.js`)
 
 `config.js`에 셀러 로그인, Anthropic 키, Slack Bot Token, 네이버 API 키의 하드코딩 fallback이 포함되어 있습니다. 환경변수가 있으면 덮어씁니다. **새 비밀값을 커밋하지 말 것**, `config.js` 전체 내용을 로그에 덤프하지 말 것.

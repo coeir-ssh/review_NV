@@ -1,8 +1,8 @@
 @echo off
-chcp 65001 >nul
-REM ===== daily review orchestrator =====
-REM node steps run directly (always foreground). Agent only writes replies.json.
-REM Use %~dp0 (this bat's own folder) to avoid Korean-path encoding issues.
+REM ===== daily review orchestrator (ASCII only, no chcp) =====
+REM node steps run directly here (always foreground). Agent only writes replies.json.
+REM No "chcp" here: chcp 65001 inside a .bat corrupts cmd file parsing under the scheduler.
+REM No literal Korean path: %~dp0 resolves the real (Korean) folder at runtime.
 
 cd /d "%~dp0"
 set "DIR=%~dp0"
@@ -24,13 +24,13 @@ echo [%date% %time%] status=%STATUS% >> "%LOG%"
 
 if "%STATUS%"=="SKIP" goto watchdog
 if "%STATUS%"=="ZERO" goto watchdog
-if "%STATUS%"=="ERR"  goto watchdog
+if "%STATUS%"=="ERR" goto watchdog
 
 REM -- Step 0.5: knowledge dump for agent --
 echo [%date% %time%] knowledge dump >> "%LOG%"
 node dump_knowledge.js > knowledge_dump.txt 2>> "%LOG%"
 
-REM -- 에이전트 실행 전 이전 replies.json 제거 (에이전트 실패 시 구파일로 등록되는 것 방지) --
+REM -- remove stale replies.json so a failed agent run cannot post yesterday's file --
 if exist replies.json del /f replies.json
 
 REM -- Step 2: agent writes replies.json (no node exec) --
