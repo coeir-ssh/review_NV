@@ -75,6 +75,20 @@ node -c post_product_reviews.js
 - **스케줄러 액션은 ASCII 경로로**: 한글 경로(`코에르\클로드`)를 PowerShell `Set-ScheduledTask` 로 넣으면 작업 XML 인코딩이 깨져 0xFF. → ASCII junction 사용: `C:\coeir_review` → 프로젝트 폴더 (`New-Item -ItemType Junction`). 스케줄 액션 = `cmd /c "C:\coeir_review\daily_review_auto.bat"`.
 - **스케줄 작업**: `코에르_리뷰_에이전트매개` 매일 07:00, WakeToRun=True. + 별도 `코에르_리뷰_워치독` 08:30 (2차 안전망).
 
+## Claude CLI 인증 (에이전트 판단용 — 모든 claude 자동화 프로그램 공용)
+
+에이전트 판단(Step 2, `claude --print`)은 **Claude 구독 토큰**으로 인증한다. **API 키 아님**(비용 0).
+- **인증 수단 = 환경변수 `CLAUDE_CODE_OAUTH_TOKEN`** (User 스코프). `claude setup-token` 으로 발급한 장기 토큰(`sk-ant-oat01-...`, 약 1년).
+- ⚠️ `claude setup-token` 은 토큰을 **화면 출력만** 함 — `~/.claude/.credentials.json` 에 저장 안 됨. 출력된 토큰을 직접 환경변수에 넣어야 함:
+  ```powershell
+  claude setup-token            # 출력된 sk-ant-oat01-... 복사
+  [Environment]::SetEnvironmentVariable('CLAUDE_CODE_OAUTH_TOKEN','<토큰>','User')
+  ```
+- **이 환경변수 하나를 리뷰·판매량리포트 등 모든 프로그램이 공유**한다 (claude.exe 가 자동으로 읽음). 프로그램별 개별 로그인 불필요.
+- **만료 시(약 1년 또는 조기 만료)**: `claude setup-token` 재발급 → 환경변수 갱신. 만료되면 7시 자동 판단이 401 로 실패하고, 워치독(`post_run_check.js`)이 매일 인증을 실제 테스트해 실패 시 DM 안내.
+- 만료일은 토큰 문자열로 알 수 없어 "사전 예측"은 불가 → 워치독이 매일 가벼운 `claude --print` 호출로 살아있는지 확인하는 방식.
+- (참고: 판매량 리포트는 데이터 파이프라인이라 Claude 미사용 — 같은 환경변수를 쓰지만 자동 실행엔 인증 의존 없음.)
+
 ## 민감 정보 (`config.js`)
 
 `config.js`에 셀러 로그인, Anthropic 키, Slack Bot Token, 네이버 API 키의 하드코딩 fallback이 포함되어 있습니다. 환경변수가 있으면 덮어씁니다. **새 비밀값을 커밋하지 말 것**, `config.js` 전체 내용을 로그에 덤프하지 말 것.

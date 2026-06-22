@@ -39,6 +39,33 @@ async function maybeWarnSessionAge() {
   } catch (e) { console.log('[워치독] 세션 점검 실패:', e.message); }
 }
 
+// Claude CLI(claude.exe) 인증 상태 점검 — 매일 실제 인증 테스트.
+// 인증은 환경변수 CLAUDE_CODE_OAUTH_TOKEN(setup-token 발급) 으로 동작하므로,
+// 토큰 문자열만으론 만료일을 알 수 없다 → "사전 예측" 대신 매일 가벼운 호출로 살아있는지 확인.
+// 401 등 인증 실패 시에만 DM 으로 재발급 안내 (그날 고쳐두면 다음날 7시 자동 실행 정상).
+const CLAUDE_BIN = process.env.CLAUDE_BIN || 'C:\\Users\\AWESOMATIC\\.local\\bin\\claude.exe';
+async function maybeWarnClaudeAuth() {
+  try {
+    const { spawnSync } = require('child_process');
+    const r = spawnSync(CLAUDE_BIN, ['--print', '--max-turns', '1'], {
+      input: 'hi', encoding: 'utf8', timeout: 60000,
+    });
+    const out = `${r.stdout || ''}${r.stderr || ''}`;
+    if (/401|authenticate|Invalid authentication/i.test(out)) {
+      await sendSlackText(
+        `🔐 *Claude 자동화 인증 만료/실패*\n` +
+        `• claude 인증이 만료되어 아침 7시 자동 판단(Step 2)이 실패합니다.\n` +
+        `• 터미널에서 \`claude setup-token\` 실행 → 출력된 토큰을 환경변수에 등록:\n` +
+        `  \`[Environment]::SetEnvironmentVariable('CLAUDE_CODE_OAUTH_TOKEN','<토큰>','User')\`\n` +
+        `• (모든 claude 자동화 프로그램이 이 환경변수 토큰을 공유합니다)`
+      );
+      console.log('[워치독] Claude 인증 실패 감지 → 재발급 안내 DM 전송');
+    } else {
+      console.log('[워치독] Claude 인증 정상');
+    }
+  } catch (e) { console.log('[워치독] Claude 인증 점검 실패:', e.message); }
+}
+
 function todayStr() {
   const n = new Date();
   return `${n.getFullYear()}${String(n.getMonth() + 1).padStart(2, '0')}${String(n.getDate()).padStart(2, '0')}`;
@@ -63,6 +90,9 @@ function readJsonSafe(file) {
   const pendingPath = path.join(DIR, 'pending_reviews.json');
   const postedPath  = path.join(DIR, 'posted_results.json');
   const reportPath  = path.join(DIR, 'reply', `${ymd}_reply.docx`);
+
+  // 매일 Claude CLI 인증 만료 사전 점검 (실행 결과와 무관하게 항상)
+  await maybeWarnClaudeAuth();
 
   const pending = readJsonSafe(pendingPath);
   const pendingFresh = isModifiedToday(pendingPath);
