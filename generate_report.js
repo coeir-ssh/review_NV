@@ -70,10 +70,15 @@ const skipSlack = argv.includes('--no-slack');
           // 환불검토 검증 — 대상이 있으면 카운트+상세, 없으면 명시
           if (refunds.length > 0) {
             lines.push(`· 환불검토 적중 ${c.refundHit || 0}건 (실제 블라인드 처리됨)`);
-            lines.push(`· 환불검토 빗나감 ${c.refundMiss || 0}건 (답변으로 처리됨 → 보수적 판단)`);
+            lines.push(`· 환불검토 빗나감 ${c.refundMiss || 0}건 (담당자가 답변으로 처리 → 보수적 판단)`);
+            if (c.refundPending || 0) lines.push(`· 환불검토 대기중 ${c.refundPending}건 (담당자 처리 전 — 익일 재확인)`);
             refunds.forEach(r => {
-              const mark = r.verdict === '적중' ? '✅ 적중' : r.verdict === '빗나감' ? '❌ 빗나감' : `· ${r.verdict}`;
-              lines.push(`[환불검토 ${mark}] ${r.reviewNo} ${short(r.productName)} — 실제 전시상태 '${r.actualStatus}'`);
+              const mark = r.verdict === '적중' ? '✅ 적중'
+                         : r.verdict === '빗나감' ? '❌ 빗나감'
+                         : r.verdict === '대기중' ? '⏳ 대기중'
+                         : `· ${r.verdict}`;
+              const tail = r.verdict === '대기중' ? '담당자 처리 전' : `실제 전시상태 '${r.actualStatus}'`;
+              lines.push(`[환불검토 ${mark}] ${r.reviewNo} ${short(r.productName)} — ${tail}`);
             });
           } else {
             lines.push(`· 전일 환불검토 항목 없었음`);

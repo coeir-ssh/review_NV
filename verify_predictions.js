@@ -308,11 +308,14 @@ const RESULT_PATH = path.join(__dirname, 'verification_result.json');
       const normal = isNormal(found.status) || isNormal(allTxt);
       actualStatus = found.status || (blind ? '블라인드' : normal ? '정상' : '?');
       hasReply = found.hasComment || '';
+      // 답글 등록 여부: 'Y' 포함이면 답변 달림, 그 외(N/빈값)는 미등록
+      const replied = /Y/i.test(hasReply);
       if (actualStatus === '?' || (!blind && !normal)) {
         // 전시상태를 읽지 못함 → 빗나감으로 단정하지 말고 확인불가 처리 (학습 오염 방지)
         verdict = '확인불가(전시상태 못읽음)';
       } else if (q.judgeLabel === '환불검토') {
-        verdict = blind ? '적중' : '빗나감';     // 환불검토인데 블라인드면 적중
+        // 블라인드 → 적중(환불됨) / 정상+답글Y → 빗나감(담당자가 답변처리) / 정상+답글N → 대기중(담당자 미처리)
+        verdict = blind ? '적중' : (replied ? '빗나감' : '대기중');
       } else { // 답변 + 판단근거
         verdict = blind ? '빗나감(환불됨)' : '정상(답변처리)';
       }
@@ -330,16 +333,26 @@ const RESULT_PATH = path.join(__dirname, 'verification_result.json');
       hasReply,
       verdict,
     });
-    // 큐 마킹
-    q.verified = true;
-    q.verifiedAt = new Date().toISOString();
-    q.verdict = verdict;
-    q.actualStatus = actualStatus;
+    // 큐 마킹 — '대기중'·'확인불가' 는 아직 확정 아니므로 verified=false 유지(다음날 재검증)
+    const settled = (verdict === '적중' || verdict === '빗나감' || verdict === '빗나감(환불됨)' || verdict === '정상(답변처리)');
+    if (settled) {
+      q.verified = true;
+      q.verifiedAt = new Date().toISOString();
+      q.verdict = verdict;
+      q.actualStatus = actualStatus;
+    } else {
+      // 대기중/확인불가 → 미확정 유지, 흔적만 기록
+      q.verified = false;
+      q.lastVerdict = verdict;
+      q.lastCheckedAt = new Date().toISOString();
+      q.actualStatus = actualStatus;
+    }
   }
 
   // 요약 카운트
-  const refundHit  = results.filter(r => r.judgeLabel === '환불검토' && r.verdict === '적중').length;
-  const refundMiss = results.filter(r => r.judgeLabel === '환불검토' && r.verdict === '빗나감').length;
+  const refundHit     = results.filter(r => r.judgeLabel === '환불검토' && r.verdict === '적중').length;
+  const refundMiss    = results.filter(r => r.judgeLabel === '환불검토' && r.verdict === '빗나감').length;
+  const refundPending = results.filter(r => r.judgeLabel === '환불검토' && r.verdict === '대기중').length;
   const ansOk      = results.filter(r => r.judgeLabel === '답변' && r.verdict === '정상(답변처리)').length;
   const ansMiss    = results.filter(r => r.judgeLabel === '답변' && r.verdict.startsWith('빗나감')).length;
   const unknown    = results.filter(r => r.verdict.startsWith('확인불가')).length;
@@ -347,7 +360,7 @@ const RESULT_PATH = path.join(__dirname, 'verification_result.json');
   const out = {
     verifiedAt: new Date().toISOString(),
     pending: pending.length,
-    counts: { refundHit, refundMiss, ansOk, ansMiss, unknown },
+    counts: { refundHit, refundMiss, refundPending, ansOk, ansMiss, unknown },
     results,
   };
   fs.writeFileSync(RESULT_PATH, JSON.stringify(out, null, 2), 'utf8');
@@ -355,7 +368,7 @@ const RESULT_PATH = path.join(__dirname, 'verification_result.json');
 
   log('');
   log('══════════════════════════════════════════');
-  log(`환불검토 적중 ${refundHit} / 빗나감 ${refundMiss}  |  답변 정상 ${ansOk} / 빗나감 ${ansMiss}  |  확인불가 ${unknown}`);
+  log(`환불검토 적중 ${refundHit} / 빗나감 ${refundMiss} / 대기중 ${refundPending}  |  답변 정상 ${ansOk} / 빗나감 ${ansMiss}  |  확인불가 ${unknown}`);
   log(`✅ 결과 저장: ${RESULT_PATH}`);
   log('══════════════════════════════════════════');
 })().catch(err => {
