@@ -253,10 +253,13 @@ async function generateWordDoc(summary, dateStr) {
         spacing: { before: 100, after: 100 }, shading: { fill: 'E2EFDA', type: ShadingType.CLEAR },
         children: [label('📚 전날 판단 검증 결과', true, 22)],
       }),
-      ...summary.verificationSummary.split('\n').map(line => new Paragraph({
-        spacing: { after: 40 },
-        children: [new TextRun({ text: line, font: 'Malgun Gothic', size: 20, color: '375623' })],
-      })),
+      ...summary.verificationSummary.split('\n').map(line => {
+        const urgent = line.includes('🚨');
+        return new Paragraph({
+          spacing: { after: 40 },
+          children: [new TextRun({ text: line, font: 'Malgun Gothic', size: urgent ? 22 : 20, bold: urgent, color: urgent ? 'C00000' : '375623' })],
+        });
+      }),
       divider(),
     ] : []),
 

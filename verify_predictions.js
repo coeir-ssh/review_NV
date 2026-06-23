@@ -320,6 +320,16 @@ const RESULT_PATH = path.join(__dirname, 'verification_result.json');
         verdict = blind ? '빗나감(환불됨)' : '정상(답변처리)';
       }
     }
+    // 대기중 경과일: 처리일(processedDate "2026. 6. 23.")로부터 오늘까지
+    let daysPending = null;
+    if (verdict === '대기중') {
+      const m = (q.processedDate || '').match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})/);
+      if (m) {
+        const d0 = new Date(+m[1], +m[2] - 1, +m[3]);
+        // 처리일을 1일째로 카운트(inclusive): 6/22 처리분은 6/23 현재 "2일째"
+        daysPending = Math.max(1, Math.floor((Date.now() - d0.getTime()) / 86400000) + 1);
+      }
+    }
     results.push({
       reviewNo:        q.reviewNo,
       productName:     q.productName,
@@ -332,6 +342,7 @@ const RESULT_PATH = path.join(__dirname, 'verification_result.json');
       actualStatus,
       hasReply,
       verdict,
+      daysPending,
     });
     // 큐 마킹 — '대기중'·'확인불가' 는 아직 확정 아니므로 verified=false 유지(다음날 재검증)
     const settled = (verdict === '적중' || verdict === '빗나감' || verdict === '빗나감(환불됨)' || verdict === '정상(답변처리)');

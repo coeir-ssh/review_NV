@@ -67,6 +67,14 @@ const skipSlack = argv.includes('--no-slack');
           const lines = [
             `(전 영업일 처리분이 실제로 어떻게 됐는지 셀러센터에서 확인한 결과)`,
           ];
+          // 2일 이상 미처리 대기중 건 → 최우선 체크 경고 (맨 위에)
+          const overdue = refunds.filter(r => r.verdict === '대기중' && (r.daysPending || 0) >= 2);
+          if (overdue.length > 0) {
+            lines.push(`🚨 환불검토 ${overdue.length}건이 2일 이상 처리되지 않고 있습니다 — 최우선 체크 요청!`);
+            overdue.forEach(r => {
+              lines.push(`🚨 ${r.reviewNo} ${short(r.productName)} — ${r.daysPending}일째 미처리`);
+            });
+          }
           // 환불검토 검증 — 대상이 있으면 카운트+상세, 없으면 명시
           if (refunds.length > 0) {
             lines.push(`· 환불검토 적중 ${c.refundHit || 0}건 (실제 블라인드 처리됨)`);
@@ -77,7 +85,7 @@ const skipSlack = argv.includes('--no-slack');
                          : r.verdict === '빗나감' ? '❌ 빗나감'
                          : r.verdict === '대기중' ? '⏳ 대기중'
                          : `· ${r.verdict}`;
-              const tail = r.verdict === '대기중' ? '담당자 처리 전' : `실제 전시상태 '${r.actualStatus}'`;
+              const tail = r.verdict === '대기중' ? `담당자 처리 전${r.daysPending != null ? ` (${r.daysPending}일째)` : ''}` : `실제 전시상태 '${r.actualStatus}'`;
               lines.push(`[환불검토 ${mark}] ${r.reviewNo} ${short(r.productName)} — ${tail}`);
             });
           } else {
