@@ -85,9 +85,25 @@ const skipSlack = argv.includes('--no-slack');
                          : r.verdict === '빗나감' ? '❌ 빗나감'
                          : r.verdict === '대기중' ? '⏳ 대기중'
                          : `· ${r.verdict}`;
-              const tail = r.verdict === '대기중' ? `담당자 처리 전${r.daysPending != null ? ` (${r.daysPending}일째)` : ''}` : `실제 전시상태 '${r.actualStatus}'`;
+              const replyDate = (r.hasReply || '').match(/(\d{4}[.\s]+\d{1,2}[.\s]+\d{1,2})/);
+              const tail = r.verdict === '대기중'
+                         ? `담당자 처리 전${r.daysPending != null ? ` (${r.daysPending}일째)` : ''}`
+                         : r.verdict === '적중'
+                         ? `실제 블라인드 처리됨 (환불 확정 → 내 환불검토 제안 적중)`
+                         : r.verdict === '빗나감'
+                         ? `환불 제안했으나 담당자가 답변(답글)으로 처리함${replyDate ? ` — 답글 ${replyDate[1].replace(/\s+/g, '')}` : ''}`
+                         : `실제 전시상태 '${r.actualStatus}'`;
               lines.push(`[환불검토 ${mark}] ${r.reviewNo} ${short(r.productName)} — ${tail}`);
             });
+            // 📝 학습 노트 — '환불 제안 → 담당자가 답변으로 처리'로 빗나간 건 (다음 판단에 반영)
+            const missed = refunds.filter(r => r.verdict === '빗나감');
+            if (missed.length > 0) {
+              lines.push(`📝 학습 노트 — '환불 제안 → 담당자가 답변으로 처리'로 빗나간 건 (다음 판단에 반영):`);
+              missed.forEach(r => {
+                const reason = (r.judgeReason || '').replace(/\s+/g, ' ').slice(0, 70);
+                lines.push(`📝 ${r.reviewNo} ${short(r.productName)} — 환불검토로 본 근거「${reason}」→ 실제론 답변으로 처리됨. 유사 케이스는 환불검토보다 답변(교환·안내) 우선 검토.`);
+              });
+            }
           } else {
             lines.push(`· 전일 환불검토 항목 없었음`);
           }
