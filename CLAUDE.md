@@ -13,11 +13,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 # ★ 현재 메인 = 데일리 자동화 오케스트레이터 (스케줄 작업이 이걸 실행)
 #   .bat 이 node 단계를 직접(포그라운드) 실행하고, 에이전트는 "판단·답변"만 담당.
-#   순서: 수집 → (지식덤프) → 에이전트 판단(replies.json) → 등록 → 검증 → 보고서 → 워치독
+#   순서: 수집 → 지식덤프 → 에이전트 판단(judgements.json) → 병합(replies.json) → 등록 → 검증 → 보고서 → 워치독
 daily_review_auto.bat
 #   세부 스크립트(개별 실행/디버그용):
 node collect_pending.js [--scheduled]   # 답글미등록 수집 → pending_reviews.json (--scheduled=영업일 가드)
 node dump_knowledge.js > knowledge_dump.txt   # 제품지식 덤프(에이전트가 읽음)
+#   에이전트(claude --print, daily_judge_prompt.txt)는 judgements.json(번호·판정·답변만) 작성 — 출력 토큰 절약
+node merge_replies.js                   # judgements.json + pending_reviews.json → 완전한 replies.json
 node post_replies.js                    # replies.json 의 답변 등록 → posted_results.json
 node verify_predictions.js              # 전날 판단 사후 검증 → verification_result.json
 node generate_report.js                 # Word + Slack 발송 (posted_results.json 기반)

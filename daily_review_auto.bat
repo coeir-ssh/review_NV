@@ -30,12 +30,17 @@ REM -- Step 0.5: knowledge dump for agent --
 echo [%date% %time%] knowledge dump >> "%LOG%"
 node dump_knowledge.js > knowledge_dump.txt 2>> "%LOG%"
 
-REM -- remove stale replies.json so a failed agent run cannot post yesterday's file --
+REM -- remove stale files so a failed agent run cannot post yesterday's data --
 if exist replies.json del /f replies.json
+if exist judgements.json del /f judgements.json
 
-REM -- Step 2: agent writes replies.json (no node exec) --
+REM -- Step 2: agent writes judgements.json (minimal fields only, no node exec) --
 echo [%date% %time%] Step2 agent judge >> "%LOG%"
 type daily_judge_prompt.txt | "%CLAUDE%" --print --add-dir "%DIR%" --dangerously-skip-permissions --max-turns 120 >> "%LOG%" 2>&1
+
+REM -- Step 2.5: merge judgements.json + pending_reviews.json -> full replies.json --
+echo [%date% %time%] Step2.5 merge >> "%LOG%"
+node merge_replies.js >> "%LOG%" 2>&1
 
 if not exist replies.json (
   echo [%date% %time%] no replies.json - skip posting >> "%LOG%"

@@ -46,3 +46,6 @@ debug_login.js
 
 # 에이전트용 지식 덤프 (생성물)
 knowledge_dump.txt
+
+# 에이전트 최소 판단 출력 (생성물)
+judgements.json
