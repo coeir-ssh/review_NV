@@ -77,10 +77,8 @@ const skipSlack = argv.includes('--no-slack');
           }
           // 환불검토 검증 — 대상이 있으면 카운트+상세, 없으면 명시
           if (refunds.length > 0) {
-            lines.push(`· 환불검토 적중 ${c.refundHit || 0}건 (실제 블라인드 처리됨)`);
-            lines.push(`· 환불검토 빗나감 ${c.refundMiss || 0}건 (담당자가 답변으로 처리 → 보수적 판단)`);
-            if (c.refundPending || 0) lines.push(`· 환불검토 대기중 ${c.refundPending}건 (담당자 처리 전 — 익일 재확인)`);
-            refunds.forEach(r => {
+            // 상세 한 줄 생성기
+            const detail = (r) => {
               const mark = r.verdict === '적중' ? '✅ 적중'
                          : r.verdict === '빗나감' ? '❌ 빗나감'
                          : r.verdict === '대기중' ? '⏳ 대기중'
@@ -93,10 +91,25 @@ const skipSlack = argv.includes('--no-slack');
                          : r.verdict === '빗나감'
                          ? `환불 제안했으나 담당자가 답변(답글)으로 처리함${replyDate ? ` — 답글 ${replyDate[1].replace(/\s+/g, '')}` : ''}`
                          : `실제 전시상태 '${r.actualStatus}'`;
-              lines.push(`[환불검토 ${mark}] ${r.reviewNo} ${short(r.productName)} — ${tail}`);
-            });
-            // 📝 학습 노트 — '환불 제안 → 담당자가 답변으로 처리'로 빗나간 건 (다음 판단에 반영)
+              return `[환불검토 ${mark}] ${r.reviewNo} ${short(r.productName)} — ${tail}`;
+            };
+            const hits   = refunds.filter(r => r.verdict === '적중');
             const missed = refunds.filter(r => r.verdict === '빗나감');
+            const pend   = refunds.filter(r => r.verdict === '대기중');
+            // 적중: 카운트 바로 밑에 내역
+            lines.push(`· 환불검토 적중 ${c.refundHit || 0}건 (실제 블라인드 처리됨)`);
+            hits.forEach(r => lines.push(detail(r)));
+            lines.push('');
+            // 빗나감: 카운트 바로 밑에 내역
+            lines.push(`· 환불검토 빗나감 ${c.refundMiss || 0}건 (담당자가 답변으로 처리 → 보수적 판단)`);
+            missed.forEach(r => lines.push(detail(r)));
+            // 대기중: 있을 때만
+            if (c.refundPending || 0) {
+              lines.push('');
+              lines.push(`· 환불검토 대기중 ${c.refundPending}건 (담당자 처리 전 — 익일 재확인)`);
+              pend.forEach(r => lines.push(detail(r)));
+            }
+            // 📝 학습 노트 — '환불 제안 → 담당자가 답변으로 처리'로 빗나간 건 (다음 판단에 반영)
             if (missed.length > 0) {
               lines.push(`📝 학습 노트 — '환불 제안 → 담당자가 답변으로 처리'로 빗나간 건 (다음 판단에 반영):`);
               missed.forEach(r => {
