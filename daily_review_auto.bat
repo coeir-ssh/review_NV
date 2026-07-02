@@ -13,17 +13,25 @@ set "LOG=%DIR%\logs\auto_%date:~0,4%%date:~5,2%%date:~8,2%.log"
 echo. >> "%LOG%"
 echo [%date% %time%] ===== START ===== >> "%LOG%"
 
-REM -- Step 1: collect (direct, foreground) --
-echo [%date% %time%] Step1 collect >> "%LOG%"
+REM -- Step 1: collect (direct, foreground; 1 retry on transient failure) --
+set "TRY=1"
+:collect
+echo [%date% %time%] Step1 collect (try %TRY%) >> "%LOG%"
 node collect_pending.js --scheduled >> "%LOG%" 2>&1
 
-REM -- decide: SKIP / ZERO / GO --
+REM -- decide: SKIP / ZERO / GO / STALE / ERR  (STALE = not today = collection failed) --
 set "STATUS=GO"
-for /f "usebackq delims=" %%i in (`node -e "try{var d=require('./pending_reviews.json');process.stdout.write(d.skipped===true?'SKIP':(d.totalReviews>0?'GO':'ZERO'))}catch(e){process.stdout.write('ERR')}"`) do set "STATUS=%%i"
+for /f "usebackq delims=" %%i in (`node collect_status.js`) do set "STATUS=%%i"
 echo [%date% %time%] status=%STATUS% >> "%LOG%"
 
+REM -- transient failure (STALE/ERR): wait 30s and retry once --
+if "%TRY%"=="1" if "%STATUS%"=="STALE" ( set "TRY=2" & echo [%date% %time%] retry collect after 30s >> "%LOG%" & ping -n 31 127.0.0.1 >nul & goto collect )
+if "%TRY%"=="1" if "%STATUS%"=="ERR"   ( set "TRY=2" & echo [%date% %time%] retry collect after 30s >> "%LOG%" & ping -n 31 127.0.0.1 >nul & goto collect )
+
+REM -- still failed after retry: skip (avoid reprocessing old data); watchdog will alert --
 if "%STATUS%"=="SKIP" goto watchdog
 if "%STATUS%"=="ZERO" goto watchdog
+if "%STATUS%"=="STALE" goto watchdog
 if "%STATUS%"=="ERR" goto watchdog
 
 REM -- Step 0.5: knowledge dump for agent --
@@ -47,14 +55,14 @@ if not exist replies.json (
   goto watchdog
 )
 
-REM -- Step 3: post (direct) --
+REM -- Step 3: post (--scheduled = auto re-login if session expired) --
 echo [%date% %time%] Step3 post >> "%LOG%"
-node post_replies.js >> "%LOG%" 2>&1
+node post_replies.js --scheduled >> "%LOG%" 2>&1
 
-REM -- Step 3.5: verify (if present) --
+REM -- Step 3.5: verify (--scheduled = auto re-login) --
 if exist verify_predictions.js (
   echo [%date% %time%] Step3.5 verify >> "%LOG%"
-  node verify_predictions.js >> "%LOG%" 2>&1
+  node verify_predictions.js --scheduled >> "%LOG%" 2>&1
 )
 
 REM -- Step 4: report + slack (direct) --
