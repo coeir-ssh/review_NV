@@ -37,6 +37,11 @@ node collect_reviews.js            # 단일 제품 리뷰 수집
 node find_review_position.js       # 특정 리뷰의 랭킹순 순위 단독 조회
 node test_review_position.js       # 순위 조회 테스트 하네스
 node resend_with_rank.js           # .review_summary.json 읽어 xlsx/docx/Slack 재생성 (재등록 없음)
+node edit_reply.js <리뷰글번호>                          # 이미 등록된 답변 수정 (드라이런: 현재 답변만 출력)
+node edit_reply.js <리뷰글번호> --text "새 답변" --apply   # 실제 저장 (--text-file f 도 가능)
+#   ⚠️ 셀러센터 '답글작성'은 이미 답변된 건에 "추가 답글 불가" 팝업만 뜸.
+#      실제 수정 경로 = 리뷰내용 셀 클릭 → 인라인 editor(vm.viewData.inputCommentContent = 기존답변 채워진 textarea)
+#      → "답글 수정" 버튼(=저장) → "답글이 수정되었습니다" 팝업. edit_reply.js 가 이 흐름 자동화(검색 1행일 때만 진행).
 
 # 최종 사용자용 .bat 래퍼
 #   AI답변생성_실행.bat, 리뷰수집_실행.bat, 전체리뷰수집_실행.bat
